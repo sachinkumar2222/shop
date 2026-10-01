@@ -1,4 +1,7 @@
 import * as productService from '../services/product.service.js';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export const getAllProducts = async (req, res, next) => {
   try {
@@ -49,6 +52,31 @@ export const updateProduct = async (req, res, next) => {
   try {
     const product = await productService.updateProduct(req.params.id, req.body);
     res.json({ success: true, message: 'Product updated', data: product });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const uploadProductImage = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No image file uploaded' });
+    }
+    const imageUrl = `/uploads/products/${req.file.filename}`;
+    const product = await prisma.product.update({
+      where: { id: req.params.id },
+      data: { imageUrl },
+    });
+    res.json({ success: true, message: 'Image uploaded', data: { imageUrl, product } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteProduct = async (req, res, next) => {
+  try {
+    await productService.deleteProduct(req.params.id);
+    res.json({ success: true, message: 'Product deleted successfully' });
   } catch (error) {
     next(error);
   }

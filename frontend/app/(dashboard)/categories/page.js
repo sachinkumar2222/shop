@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../../../lib/api.js';
+import { useAuth } from '../../../context/AuthContext.js';
 import { Tags, Plus, Trash2, Edit2, Layers } from 'lucide-react';
 
 export default function CategoriesPage() {
+  const { user } = useAuth();
   const [categories, setCategories] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -80,21 +82,54 @@ export default function CategoriesPage() {
   };
 
   return (
+    <>
+      <style>{`
+        .cat-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .cat-modal {
+          width: 400px;
+          border-radius: 20px;
+          padding: 2rem;
+        }
+        @media (max-width: 768px) {
+          .cat-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+          }
+          .cat-header button {
+            width: 100%;
+          }
+          .cat-modal {
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 0 !important;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+          }
+        }
+      `}</style>
     <div style={styles.container}>
-      <div style={styles.header}>
+      <div className="cat-header">
         <div>
           <h1 style={styles.title}>Product Categories</h1>
           <p style={styles.subtitle}>Manage bilingual product categories for Pooja items</p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="btn btn-primary"
-        >
-          <Plus size={18} /> Add Category
-        </button>
+        {user?.role === 'ADMIN' && (
+          <button
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+            className="btn btn-primary"
+          >
+            <Plus size={18} /> Add Category
+          </button>
+        )}
       </div>
 
       {/* Grid */}
@@ -105,22 +140,24 @@ export default function CategoriesPage() {
               <div style={styles.iconBox}>
                 <Tags size={20} color="#f97316" />
               </div>
-              <div style={styles.actions}>
-                <button
-                  onClick={() => openEdit(c)}
-                  className="btn btn-sm btn-secondary"
-                  title="Edit"
-                >
-                  <Edit2 size={14} />
-                </button>
-                <button
-                  onClick={() => handleDelete(c.id)}
-                  className="btn btn-sm btn-secondary"
-                  title="Delete"
-                >
-                  <Trash2 size={14} color="#f43f5e" />
-                </button>
-              </div>
+              {user?.role === 'ADMIN' && (
+                <div style={styles.actions}>
+                  <button
+                    onClick={() => openEdit(c)}
+                    className="btn btn-sm btn-secondary"
+                    title="Edit"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(c.id)}
+                    className="btn btn-sm btn-secondary"
+                    title="Delete"
+                  >
+                    <Trash2 size={14} color="#f43f5e" />
+                  </button>
+                </div>
+              )}
             </div>
 
             <h3 style={styles.catNameEn}>{c.nameEn}</h3>
@@ -132,7 +169,7 @@ export default function CategoriesPage() {
       {/* Add / Edit Modal */}
       {showModal && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modal} className="glass-panel animate-fade-in">
+          <div className="cat-modal glass-panel animate-fade-in">
             <h2>{editingCategory ? 'Edit Category' : 'Add New Category'}</h2>
             {error && <div style={styles.errorBox}>{error}</div>}
 
@@ -182,6 +219,7 @@ export default function CategoriesPage() {
         </div>
       )}
     </div>
+    </>
   );
 }
 
@@ -202,7 +240,7 @@ const styles = {
   },
   subtitle: {
     fontSize: '0.85rem',
-    color: '#94a3b8',
+    color: '#536168',
   },
   grid: {
     display: 'grid',
@@ -237,11 +275,11 @@ const styles = {
   catNameEn: {
     fontSize: '1.1rem',
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#1f2a2e',
   },
   catNameHi: {
     fontSize: '0.9rem',
-    color: '#94a3b8',
+    color: '#647179',
   },
   modalOverlay: {
     position: 'fixed',

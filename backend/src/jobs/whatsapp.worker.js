@@ -33,7 +33,8 @@ export const whatsappWorker = new Worker(
   },
   {
     connection: redisConnection,
-    concurrency: 5,
+    // One active job can wait for WhatsApp pairing without occupying every worker slot.
+    concurrency: 1,
     defaultJobOptions: {
       attempts: 3,
       backoff: { type: 'exponential', delay: 5000 },

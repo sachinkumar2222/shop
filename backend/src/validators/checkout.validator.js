@@ -2,6 +2,23 @@ import { z } from 'zod';
 import { ValidationError } from '../utils/AppError.js';
 import { PAYMENT_MODES } from '../constants/index.js';
 
+const checkoutItemSchema = z.object({
+  productId: z.string().uuid('Invalid product ID'),
+  unitId: z.union([z.string().uuid(), z.literal('')]).optional(),
+  // The current multi-unit cart sends qtyInUnit. Keep qty accepted for older clients.
+  qtyInUnit: z.number().positive().optional(),
+  qty: z.number().positive().optional(),
+  salePrice: z.number().positive('Sale price must be positive'),
+}).superRefine((item, ctx) => {
+  if (item.qtyInUnit === undefined && item.qty === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['qtyInUnit'],
+      message: 'Quantity is required',
+    });
+  }
+});
+
 export const checkoutSchema = z.object({
   customerName: z.string().min(1, 'Customer name is required'),
   phone: z
@@ -13,13 +30,7 @@ export const checkoutSchema = z.object({
     }),
   }),
   items: z
-    .array(
-      z.object({
-        productId: z.string().uuid('Invalid product ID'),
-        qty: z.number().int().positive('Quantity must be a positive integer'),
-        salePrice: z.number().positive('Sale price must be positive'),
-      })
-    )
+    .array(checkoutItemSchema)
     .min(1, 'At least one item is required'),
 });
 

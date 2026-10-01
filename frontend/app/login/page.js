@@ -30,9 +30,7 @@ export default function LoginPage() {
       <div style={styles.card} className="glass-panel animate-fade-in">
         {/* Header */}
         <div style={styles.header}>
-          <div style={styles.logoBadge}>
-            <ShoppingBag size={28} color="#f97316" />
-          </div>
+          <img src="/logo.png" alt="श्री पूजा घर Logo" style={{ width: 64, height: 64, borderRadius: 16, objectFit: 'contain', marginBottom: '0.75rem' }} />
           <h1 style={styles.title}>श्री पूजा घर</h1>
           <p style={styles.subtitle}>POS, Inventory & WhatsApp Automation System</p>
         </div>
@@ -105,7 +103,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: '100vh',
-    background: 'radial-gradient(circle at 50% 20%, rgba(249, 115, 22, 0.12) 0%, transparent 60%), #0f1117',
+    background: 'radial-gradient(circle at 12% 10%, rgba(217, 104, 35, 0.12) 0%, transparent 40%), var(--bg-primary)',
     padding: '1.5rem',
   },
   card: {
@@ -113,7 +111,9 @@ const styles = {
     maxWidth: '420px',
     borderRadius: '24px',
     padding: '2.5rem 2rem',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: '#fff',
+    border: '1px solid #e5e7e2',
+    boxShadow: '0 24px 70px rgba(31,42,46,0.12)',
   },
   header: {
     textAlign: 'center',
@@ -133,19 +133,17 @@ const styles = {
   title: {
     fontSize: '1.8rem',
     fontWeight: '800',
-    background: 'linear-gradient(135deg, #ffffff 0%, #f97316 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
+    color: '#1f2a2e',
     marginBottom: '0.3rem',
   },
   subtitle: {
     fontSize: '0.85rem',
-    color: '#94a3b8',
+    color: '#536168',
   },
   errorBox: {
-    background: 'rgba(244, 63, 94, 0.15)',
-    border: '1px solid rgba(244, 63, 94, 0.3)',
-    color: '#f43f5e',
+    background: '#fff0f0',
+    border: '1px solid #f3c9ce',
+    color: '#a72e3e',
     padding: '0.75rem 1rem',
     borderRadius: '10px',
     fontSize: '0.85rem',
@@ -175,7 +173,7 @@ const styles = {
   demoFooter: {
     marginTop: '2rem',
     paddingTop: '1.25rem',
-    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+    borderTop: '1px solid #e5e7e2',
     textAlign: 'center',
     fontSize: '0.78rem',
     color: '#64748b',

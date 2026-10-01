@@ -1,0 +1,84 @@
+services:
+  # ─── PostgreSQL Database ───
+  postgres:
+    image: postgres:15-alpine
+    container_name: shree_pooja_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: shreepooja
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis Cache & Job Queue ───
+  redis:
+    image: redis:7-alpine
+    container_name: shree_pooja_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Express Backend ───
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: shree_pooja_backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: "postgresql://postgres:postgrespassword@postgres:5432/shreepooja?schema=public"
+      DIRECT_URL: "postgresql://postgres:postgrespassword@postgres:5432/shreepooja?schema=public"
+      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: "shreepoojaghr-super-secret-jwt-key-2024"
+      JWT_EXPIRES_IN: "30d"
+      WHATSAPP_PROVIDER: "opensource"
+      CORS_ORIGIN: "*"
+    ports:
+      - "3001:3001"
+    volumes:
+      - product_uploads:/app/uploads
+      - whatsapp_session:/app/.wwebjs_auth
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─── Next.js Frontend ───
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: shree_pooja_frontend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      BACKEND_URL: "http://backend:3001"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+  product_uploads:
+  whatsapp_session:

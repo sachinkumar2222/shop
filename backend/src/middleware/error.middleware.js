@@ -2,19 +2,19 @@ import { AppError } from '../utils/AppError.js';
 import { logger } from '../config/logger.js';
 
 export const errorHandler = (err, req, res, next) => {
-  let error = { ...err };
-  error.message = err.message;
-  
-  if (!(err instanceof AppError)) {
+  const statusCode = err.statusCode || 500;
+  const message = err.message || 'Internal Server Error';
+  const code = err.code || 'INTERNAL_SERVER_ERROR';
+
+  if (statusCode >= 500) {
     logger.error({ err }, 'Unhandled Error');
-    error = new AppError('Internal Server Error', 500, 'INTERNAL_SERVER_ERROR', false);
   } else {
-    logger.warn({ err }, 'Operational Error');
+    logger.warn({ err }, `Operational Error: ${message}`);
   }
 
-  res.status(error.statusCode || 500).json({
+  res.status(statusCode).json({
     success: false,
-    code: error.code || 'ERROR',
-    message: error.message
+    code,
+    message
   });
 };

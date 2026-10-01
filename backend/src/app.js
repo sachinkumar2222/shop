@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { logger } from './config/logger.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { requestId } from './middleware/requestId.middleware.js';
@@ -17,6 +19,10 @@ import reportsRoutes from './routes/reports.route.js';
 import exportsRoutes from './routes/exports.route.js';
 import customerRoutes from './routes/customer.route.js';
 import userRoutes from './routes/user.route.js';
+import upiRoutes from './routes/upi.route.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -27,6 +33,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(requestId);
 app.use(pinoHttp({ logger }));
+
+// Serve uploaded product images statically
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Global rate limiter
 app.use('/api/', apiLimiter);
@@ -43,6 +52,7 @@ app.use('/api/v1/reports', reportsRoutes);
 app.use('/api/v1/exports', exportsRoutes);
 app.use('/api/v1/customers', customerRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/upi', upiRoutes);
 
 // 404 handler
 app.use((req, res, next) => {

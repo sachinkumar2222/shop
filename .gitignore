@@ -1,28 +1,46 @@
-# Dependency folders (Node modules)
+# ─── Dependencies ───
 node_modules/
 **/node_modules/
 
-# Credentials and Environment variables (CRITICAL)
+# ─── Next.js Build Outputs & Cache ───
+.next/
+out/
+build/
+dist/
+.swc/
+.turbo/
+
+# ─── WhatsApp Session Auth & Cache (CRITICAL) ───
+.wwebjs_auth/
+**/.wwebjs_auth/
+.wwebjs_cache/
+**/.wwebjs_cache/
+
+# ─── Uploaded Media & Generated PDFs ───
+backend/uploads/*
+!backend/uploads/.gitkeep
+*.pdf
+receipt_*.pdf
+
+# ─── Environment Variables & Secrets (CRITICAL) ───
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env*.local
 *.env
+!.env.example
 credentials.json
 config/jwt.txt
 
-# Log files
+# ─── Logs & Debugging ───
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Operating system files
+# ─── Operating System & Editor Files ───
 .DS_Store
 Thumbs.db
-
-# Build and production outputs (optional but recommended)
-.next/
-dist/
-build/
+.vscode/
+.idea/
+*.swp
+*.swo

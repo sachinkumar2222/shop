@@ -2,12 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../../../lib/api.js';
-import { FileText, Eye, Printer, MessageSquare, CheckCircle, Clock } from 'lucide-react';
+import { printThermalReceipt } from '../../../lib/printThermalReceipt.js';
+import { useAuth } from '../../../context/AuthContext.js';
+import { Eye, Printer, MessageSquare } from 'lucide-react';
 
 export default function InvoicesPage() {
+  const { user } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [resendingInvoice, setResendingInvoice] = useState('');
+  const [printingInvoice, setPrintingInvoice] = useState(false);
 
   useEffect(() => {
     fetchInvoices();
@@ -33,7 +38,50 @@ export default function InvoicesPage() {
     }
   };
 
+  const resendWhatsAppInvoice = async (invoiceNo) => {
+    setResendingInvoice(invoiceNo);
+    try {
+      await apiFetch(`/invoices/${encodeURIComponent(invoiceNo)}/resend-whatsapp`, { method: 'POST' });
+      setInvoices((current) => current.map((invoice) => (
+        invoice.invoiceNo === invoiceNo ? { ...invoice, waStatus: 'QUEUED' } : invoice
+      )));
+    } catch (err) {
+      alert(err.message || 'Could not queue the WhatsApp invoice');
+    } finally {
+      setResendingInvoice('');
+    }
+  };
+
+  const printSelectedInvoice = async () => {
+    if (!selectedInvoice?.invoiceNo) return;
+    setPrintingInvoice(true);
+    try {
+      await printThermalReceipt(selectedInvoice.invoiceNo);
+    } catch (err) {
+      alert(err.message || 'Could not open the printer bill');
+    } finally {
+      setPrintingInvoice(false);
+    }
+  };
+
   return (
+    <>
+      <style>{`
+        .inv-modal-detail {
+          width: 460px;
+          border-radius: 20px;
+          padding: 2rem;
+          max-height: 100vh;
+          overflow-y: auto;
+        }
+        @media (max-width: 768px) {
+          .inv-modal-detail {
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 0 !important;
+          }
+        }
+      `}</style>
     <div style={styles.container}>
       <div style={styles.header}>
         <div>
@@ -43,8 +91,8 @@ export default function InvoicesPage() {
       </div>
 
       {/* Table */}
-      <div style={styles.tableContainer} className="glass-panel">
-        <table style={styles.table}>
+      <div className="table-container table-responsive">
+        <table className="custom-table">
           <thead>
             <tr>
               <th>Invoice No</th>
@@ -54,7 +102,7 @@ export default function InvoicesPage() {
               <th>Total Amount</th>
               <th>Profit Locked</th>
               <th>WhatsApp Status</th>
-              <th>Action</th>
+              {user?.role === 'ADMIN' && <th>Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -77,12 +125,12 @@ export default function InvoicesPage() {
                   <span className="badge badge-info">{inv.paymentMode}</span>
                 </td>
                 <td>
-                  <strong style={{ fontSize: '1.05rem', color: '#f97316' }}>
+                  <strong style={{ fontSize: '1.05rem', color: '#b95117' }}>
                     ₹{Number(inv.totalAmount).toFixed(2)}
                   </strong>
                 </td>
                 <td>
-                  <strong style={{ color: '#10b981' }}>
+                  <strong style={{ color: '#187653' }}>
                     ₹{Number(inv.totalProfit).toFixed(2)}
                   </strong>
                 </td>
@@ -99,14 +147,27 @@ export default function InvoicesPage() {
                     {inv.waStatus}
                   </span>
                 </td>
-                <td>
-                  <button
-                    onClick={() => viewDetails(inv.invoiceNo)}
-                    className="btn btn-sm btn-secondary"
-                  >
-                    <Eye size={14} /> View
-                  </button>
-                </td>
+                {user?.role === 'ADMIN' && (
+                  <td>
+                    {inv.waStatus === 'FAILED' && inv.customerPhone && (
+                      <button
+                        onClick={() => resendWhatsAppInvoice(inv.invoiceNo)}
+                        className="btn btn-sm btn-secondary"
+                        style={{ marginRight: '0.4rem' }}
+                        disabled={resendingInvoice === inv.invoiceNo}
+                        title="Queue this invoice for WhatsApp again"
+                      >
+                        <MessageSquare size={14} /> {resendingInvoice === inv.invoiceNo ? 'Queueing…' : 'Retry WhatsApp'}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => viewDetails(inv.invoiceNo)}
+                      className="btn btn-sm btn-secondary"
+                    >
+                      <Eye size={14} /> View
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -116,7 +177,7 @@ export default function InvoicesPage() {
       {/* Invoice Detail Modal */}
       {selectedInvoice && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modal} className="glass-panel animate-fade-in">
+          <div className="inv-modal-detail glass-panel animate-fade-in">
             <div style={styles.modalHeader}>
               <h2>Invoice {selectedInvoice.invoiceNo}</h2>
               <button
@@ -153,21 +214,21 @@ export default function InvoicesPage() {
             <div style={styles.summaryBox}>
               <div style={styles.sumRow}>
                 <span>Total Amount:</span>
-                <span style={{ fontSize: '1.2rem', color: '#f97316', fontWeight: '800' }}>
+                <span style={{ fontSize: '1.2rem', color: '#b95117', fontWeight: '800' }}>
                   ₹{Number(selectedInvoice.totalAmount).toFixed(2)}
                 </span>
               </div>
               <div style={styles.sumRow}>
                 <span>Profit Earned:</span>
-                <span style={{ color: '#10b981', fontWeight: '800' }}>
+                <span style={{ color: '#187653', fontWeight: '800' }}>
                   ₹{Number(selectedInvoice.totalProfit).toFixed(2)}
                 </span>
               </div>
             </div>
 
             <div style={styles.modalActions}>
-              <button onClick={() => window.print()} className="btn btn-secondary">
-                <Printer size={16} /> Print
+              <button onClick={printSelectedInvoice} className="btn btn-secondary" disabled={printingInvoice}>
+                <Printer size={16} /> {printingInvoice ? 'Preparing…' : 'Print Bill'}
               </button>
               <button onClick={() => setSelectedInvoice(null)} className="btn btn-primary">
                 Close
@@ -177,6 +238,7 @@ export default function InvoicesPage() {
         </div>
       )}
     </div>
+    </>
   );
 }
 
@@ -197,7 +259,7 @@ const styles = {
   },
   subtitle: {
     fontSize: '0.85rem',
-    color: '#94a3b8',
+    color: '#536168',
   },
   tableContainer: {
     borderRadius: '18px',
@@ -211,7 +273,7 @@ const styles = {
   },
   code: {
     background: 'rgba(249, 115, 22, 0.15)',
-    color: '#f97316',
+    color: '#a84918',
     padding: '0.25rem 0.5rem',
     borderRadius: '6px',
     fontWeight: '700',
@@ -243,12 +305,12 @@ const styles = {
   closeBtn: {
     background: 'transparent',
     border: 'none',
-    color: '#94a3b8',
+    color: '#647179',
     fontSize: '1.2rem',
     cursor: 'pointer',
   },
   metaBox: {
-    background: 'rgba(255, 255, 255, 0.03)',
+    background: '#f6f6f2',
     borderRadius: '12px',
     padding: '0.75rem 1rem',
     fontSize: '0.85rem',
@@ -268,13 +330,13 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    background: 'rgba(255, 255, 255, 0.02)',
+    background: '#f8f8f5',
     padding: '0.6rem 0.8rem',
     borderRadius: '8px',
     fontSize: '0.85rem',
   },
   summaryBox: {
-    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+    borderTop: '1px solid #e5e7e2',
     paddingTop: '0.8rem',
     display: 'flex',
     flexDirection: 'column',

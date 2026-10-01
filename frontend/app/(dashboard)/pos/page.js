@@ -15,8 +15,18 @@ import {
   QrCode,
   Banknote,
   BookOpen,
+  ChevronDown,
 } from 'lucide-react';
 import QRCode from '../../../components/QRCode.js';
+
+const getSellUnits = (product) => {
+  const units = product?.units || [];
+  const sellUnits = units.filter((unit) => unit.isSellUnit === true);
+  // Keep support for older API responses that do not include unit-role flags.
+  return sellUnits.length || units.some((unit) => typeof unit.isSellUnit === 'boolean')
+    ? sellUnits
+    : units;
+};
 
 export default function POSPage() {
   const [products, setProducts] = useState([]);
@@ -24,16 +34,10 @@ export default function POSPage() {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState([]);
+  const [activePopoverProductId, setActivePopoverProductId] = useState(null);
   
-  // Checkout Form
-  const [customerName, setCustomerName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [paymentMode, setPaymentMode] = useState('UPI');
-  const [upiId, setUpiId] = useState('7877496745@axl');
-  const [cashGiven, setCashGiven] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [completedInvoice, setCompletedInvoice] = useState(null);
+  // Checkout moved to /cart page.
+  const [selectedUnitMap, setSelectedUnitMap] = useState({});
 
   useEffect(() => {
     fetchProducts();
@@ -43,7 +47,19 @@ export default function POSPage() {
   const fetchProducts = async () => {
     try {
       const res = await apiFetch('/products');
-      setProducts(res.data || []);
+      const fetchedProducts = res.data || [];
+      setProducts(fetchedProducts);
+
+      // Pre-select the base unit or first configured selling unit.
+      const defaultUnits = {};
+      fetchedProducts.forEach((p) => {
+        const sellUnits = getSellUnits(p);
+        if (sellUnits.length > 0) {
+          const baseSellUnit = sellUnits.find((u) => Number(u.factorToBase) === 1) || sellUnits[0];
+          defaultUnits[p.id] = baseSellUnit.id;
+        }
+      });
+      setSelectedUnitMap((prev) => ({ ...defaultUnits, ...prev }));
     } catch (err) {
       console.error(err);
     }
@@ -58,52 +74,115 @@ export default function POSPage() {
     }
   };
 
-  // Add item to cart
-  const addToCart = (product) => {
-    if (product.totalAvailableStock <= 0) {
+  // Load cart on mount to keep in sync with /cart page
+  useEffect(() => {
+    try {
+      const savedCart = localStorage.getItem('pos_cart');
+      if (savedCart) {
+        setCart(JSON.parse(savedCart));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  // Save cart to local storage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('pos_cart', JSON.stringify(cart));
+  }, [cart]);
+
+
+
+  // Add item to cart with selected unit
+  const addToCart = (product, unitOverride = null) => {
+    const totalStock = Number(product.totalStockBase ?? product.totalAvailableStock ?? 0);
+    if (totalStock <= 0) {
       alert('This product is out of stock!');
       return;
     }
 
-    setCart((prev) => {
-      const existing = prev.find((item) => item.productId === product.id);
-      if (existing) {
-        if (existing.qty + 1 > product.totalAvailableStock) {
-          alert(`Only ${product.totalAvailableStock} items available in stock!`);
-          return prev;
-        }
-        return prev.map((item) =>
-          item.productId === product.id ? { ...item, qty: item.qty + 1 } : item
-        );
+    const availableUnits = getSellUnits(product);
+    if (product.units?.length > 0 && availableUnits.length === 0) {
+      alert('No selling unit is configured for this product. Update it from Inventory first.');
+      return;
+    }
+    let targetUnit = unitOverride;
+
+    if (!targetUnit) {
+      const selectedUnitId = selectedUnitMap[product.id];
+      if (availableUnits.length > 0) {
+        targetUnit = availableUnits.find((u) => u.id === selectedUnitId) || availableUnits[0];
       }
-      // Default sale price from latest batch or selling price
-      const defaultPrice = product.batches?.[0]?.sellingPrice || 100;
+    }
+
+    if (!targetUnit) {
+      targetUnit = {
+        id: 'legacy-unit',
+        unitName: product.unit || 'Pcs',
+        factorToBase: 1,
+        salePrice: Number(product.batches?.[0]?.sellingPrice || 100),
+      };
+    }
+
+    const factor = Number(targetUnit.factorToBase || 1);
+    if (totalStock < factor) {
+      alert(`Insufficient stock to add 1 ${targetUnit.unitName}! Available stock: ${product.formattedStock || totalStock}`);
+      return;
+    }
+
+    const cartItemId = `${product.id}-${targetUnit.id}`;
+
+    setCart((prev) => {
+      const existingIndex = prev.findIndex((item) => item.cartItemId === cartItemId);
+      if (existingIndex > -1) {
+        // Item already in cart. Quantity will be adjusted on the Cart page.
+        // Alert user that it's already added to avoid double adding silently.
+        alert(`Product added! Go to Cart & Order page to update quantity.`);
+        return prev;
+      }
+
+      alert(`${product.nameEn} added to cart!`);
       return [
         ...prev,
         {
+          cartItemId,
           productId: product.id,
+          unitId: targetUnit.id !== 'legacy-unit' ? targetUnit.id : null,
+          unitName: targetUnit.unitName,
+          factorToBase: factor,
           nameEn: product.nameEn,
           nameHi: product.nameHi,
-          salePrice: Number(defaultPrice),
-          qty: 1,
-          maxStock: product.totalAvailableStock,
+          salePrice: Number(targetUnit.salePrice),
+          qtyInUnit: 1,
+          allowDecimalQty: Boolean(product.allowDecimalQty),
+          totalStockBase: totalStock,
         },
       ];
     });
   };
 
   // Adjust cart qty
-  const updateQty = (productId, delta) => {
+  const updateQty = (cartItemId, deltaOrValue, isDirectInput = false) => {
     setCart((prev) =>
       prev
         .map((item) => {
-          if (item.productId === productId) {
-            const newQty = item.qty + delta;
-            if (newQty > item.maxStock) {
-              alert(`Max available stock is ${item.maxStock}`);
+          if (item.cartItemId === cartItemId) {
+            let newQty = isDirectInput ? parseFloat(deltaOrValue) || 0 : item.qtyInUnit + deltaOrValue;
+            if (newQty <= 0) return null;
+
+            if (!item.allowDecimalQty) {
+              newQty = Math.floor(newQty);
+            }
+
+            const requiredBase = newQty * item.factorToBase;
+            if (requiredBase > item.totalStockBase) {
+              const maxInUnit = item.allowDecimalQty
+                ? (item.totalStockBase / item.factorToBase).toFixed(2)
+                : Math.floor(item.totalStockBase / item.factorToBase);
+              alert(`Max available for this unit is ${maxInUnit} ${item.unitName}`);
               return item;
             }
-            return newQty > 0 ? { ...item, qty: newQty } : null;
+            return { ...item, qtyInUnit: newQty };
           }
           return item;
         })
@@ -111,14 +190,14 @@ export default function POSPage() {
     );
   };
 
-  const removeFromCart = (productId) => {
-    setCart((prev) => prev.filter((item) => item.productId !== productId));
+  const removeFromCart = (cartItemId) => {
+    setCart((prev) => prev.filter((item) => item.cartItemId !== cartItemId));
   };
 
   // Calculate totals
-  const subtotal = cart.reduce((sum, item) => sum + item.salePrice * item.qty, 0);
+  const subtotal = cart.reduce((sum, item) => sum + item.salePrice * item.qtyInUnit, 0);
 
-  // Handle POS Checkout
+  // Handle POS Checkout with Idempotency Key
   const handleCheckout = async (e) => {
     e.preventDefault();
     if (cart.length === 0) return alert('Cart is empty!');
@@ -126,14 +205,21 @@ export default function POSPage() {
     setError('');
     setLoading(true);
 
+    const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `pos-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     try {
       const payload = {
+        idempotencyKey,
         customerName: customerName.trim() || 'Guest Customer',
-        phone: phone.trim() || '9829012345',
+        phone: phone.trim() || undefined,
         paymentMode,
         items: cart.map((item) => ({
           productId: item.productId,
-          qty: item.qty,
+          unitId: item.unitId,
+          qtyInUnit: item.qtyInUnit,
+          qty: item.qtyInUnit,
           salePrice: item.salePrice,
         })),
       };
@@ -190,13 +276,95 @@ export default function POSPage() {
   });
 
   return (
-    <div style={styles.posContainer}>
+    <>
+      <style>{`
+        .pos-layout {
+          display: flex;
+          gap: 1.25rem;
+          height: calc(100vh - 3.5rem);
+        }
+        .pos-left-panel {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          min-width: 0;
+          overflow: hidden;
+        }
+        .pos-product-card {
+          overflow: hidden;
+          transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+        .pos-product-card:hover {
+          transform: translateY(-3px);
+          border-color: #d7b79e !important;
+          box-shadow: 0 14px 30px rgba(31, 42, 46, 0.1) !important;
+        }
+        .pos-right-panel {
+          width: 410px;
+          min-width: 410px;
+          border-radius: 20px;
+          padding: 1.25rem;
+          display: flex;
+          flex-direction: column;
+          background: rgba(23, 26, 35, 0.85);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+          overflow-y: auto;
+        }
+        .pos-cart-list {
+          min-height: 140px;
+          max-height: 240px;
+          overflow-y: auto;
+          margin: 0.75rem 0;
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+          background: rgba(0, 0, 0, 0.25);
+          border-radius: 14px;
+          padding: 0.65rem;
+          border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .pos-checkout-section {
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          padding-top: 0.85rem;
+          flex-shrink: 0;
+        }
+        .receipt-modal {
+          width: 360px;
+          border-radius: 20px;
+          padding: 2rem 1.5rem;
+          text-align: center;
+        }
+        @media (max-width: 768px) {
+          .pos-layout {
+            flex-direction: column;
+            height: auto;
+            gap: 1rem;
+          }
+          .pos-right-panel {
+            width: 100%;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+          }
+          .receipt-modal {
+            width: 100%;
+            height: 100%;
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+          }
+        }
+      `}</style>
+      <div className="pos-layout">
       {/* Left: Product Selector */}
-      <div style={styles.leftPanel}>
+      <div className="pos-left-panel" style={styles.leftPanel}>
         {/* Search Header */}
         <div style={styles.searchBox} className="glass-panel">
           <div style={styles.searchInputWrapper}>
-            <Search size={20} color="#94a3b8" />
+            <Search size={20} color="#758188" />
             <input
               type="text"
               placeholder="Search product name or scan barcode..."
@@ -230,40 +398,138 @@ export default function POSPage() {
         {/* Product Grid */}
         <div style={styles.productGrid}>
           {filteredProducts.map((product) => {
-            const isOutOfStock = product.totalAvailableStock <= 0;
-            const isLowStock = product.totalAvailableStock <= product.minAlertQty;
+            const stockBase = Number(product.totalStockBase ?? product.totalAvailableStock ?? 0);
+            const isOutOfStock = stockBase <= 0;
+            const isLowStock = stockBase <= (product.minAlertQty ?? 5);
+
+            const sellUnits = getSellUnits(product);
+            const hasUnits = sellUnits.length > 0;
+            const selectedUnitId = selectedUnitMap[product.id] || (hasUnits ? sellUnits[0].id : null);
+            const activeUnitObj = hasUnits
+              ? sellUnits.find((u) => u.id === selectedUnitId) || sellUnits[0]
+              : null;
+
+            const activeUnit = activeUnitObj
+              ? {
+                  ...activeUnitObj,
+                  unitName: activeUnitObj.unitName || activeUnitObj.nameEn || product.baseUnit,
+                  salePrice: activeUnitObj.salePrice !== undefined ? activeUnitObj.salePrice : activeUnitObj.sellingPrice,
+                }
+              : {
+                  unitName: product.unit || product.baseUnit || 'Pcs',
+                  salePrice: product.batches?.[0]?.sellingPrice || 0,
+                  factorToBase: 1,
+                };
+
+            const unitPrice = Number(activeUnit.salePrice || 0);
 
             return (
               <div
                 key={product.id}
-                style={{
-                  ...styles.productCard,
-                  ...(isOutOfStock ? styles.outOfStockCard : {}),
-                }}
-                className="card animate-fade-in"
-                onClick={() => !isOutOfStock && addToCart(product)}
+                style={isOutOfStock ? { ...styles.productCard, ...styles.outOfStockCard } : styles.productCard}
+                className="pos-product-card animate-fade-in"
               >
-                <div style={styles.productMeta}>
-                  <span className={`badge ${isOutOfStock ? 'badge-danger' : isLowStock ? 'badge-warning' : 'badge-success'}`}>
-                    {isOutOfStock ? 'Out of Stock' : `${product.totalAvailableStock} left`}
-                  </span>
-                  <span style={styles.unitBadge}>{product.unit}</span>
+                {/* Product Image Box */}
+                <div style={styles.cardImageBox}>
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.nameEn}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: '3.5rem' }}>🪔</div>
+                  )}
+                  {isOutOfStock && (
+                    <div style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
+                      <span className="badge badge-danger">Out of Stock</span>
+                    </div>
+                  )}
                 </div>
 
-                <h3 style={styles.productTitle}>{product.nameEn}</h3>
-                <div style={styles.hindiName}>{product.nameHi}</div>
-
-                <div style={styles.productFooter}>
-                  <div style={styles.priceTag}>
-                    ₹{product.batches?.[0]?.sellingPrice || '0.00'}
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, padding: '0 0.2rem' }}>
+                  {/* Title & Names */}
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <h3 style={styles.cardTitle}>{product.nameEn}</h3>
+                    <div style={styles.cardSubtitle}>{product.nameHi}</div>
                   </div>
-                  <button
-                    className="btn btn-sm btn-primary"
-                    disabled={isOutOfStock}
-                    style={{ padding: '0.3rem 0.6rem' }}
-                  >
-                    <Plus size={14} /> Add
-                  </button>
+
+                  {/* Unit Selector Row */}
+                  {hasUnits && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={styles.selectSizeHeader}>Select Size</div>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {sellUnits.map((u) => {
+                          const uName = u.unitName || u.nameEn || 'Unit';
+                          const isSelected = selectedUnitId === u.id;
+                          const factor = Number(u.factorToBase || 1);
+                          const isStockDeficit = stockBase < factor;
+
+                          return (
+                            <button
+                              key={u.id}
+                              type="button"
+                              disabled={isStockDeficit}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedUnitMap((prev) => ({ ...prev, [product.id]: u.id }));
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                fontSize: '0.85rem',
+                                fontWeight: '600',
+                                border: isSelected ? '1.5px solid #d96823' : '1px solid #d9ddd7',
+                                background: isSelected ? '#fdf0e7' : '#ffffff',
+                                color: isStockDeficit ? '#758188' : '#1f2a2e',
+                                cursor: isStockDeficit ? 'not-allowed' : 'pointer',
+                                opacity: isStockDeficit ? 0.5 : 1,
+                                minWidth: '42px',
+                                maxWidth: '100%',
+                                textAlign: 'center',
+                                whiteSpace: 'normal',
+                                overflowWrap: 'anywhere',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {uName}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ flex: 1 }}></div>
+
+                  {/* Card Footer: Price & Add Button */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: 'auto' }}>
+                    <button
+                      disabled={isOutOfStock || (product.units?.length > 0 && !hasUnits)}
+                      onClick={() => !isOutOfStock && (hasUnits || !product.units?.length) && addToCart(product, activeUnit)}
+                      style={{
+                        background: '#124336',
+                        color: '#ffffff',
+                        borderRadius: '24px',
+                        padding: '0.65rem 1.25rem',
+                        fontWeight: 600,
+                        fontSize: '0.9rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        border: 'none',
+                        cursor: isOutOfStock || !hasUnits ? 'not-allowed' : 'pointer',
+                        opacity: isOutOfStock || !hasUnits ? 0.6 : 1,
+                        transition: 'transform 0.1s ease',
+                      }}
+                    >
+                      <ShoppingBag size={16} /> {hasUnits || !product.units?.length ? 'Add to cart' : 'No selling unit'}
+                    </button>
+                    
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1f2a2e' }}>
+                      ₹{unitPrice.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
               </div>
             );
@@ -271,298 +537,12 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Right: Shopping Cart & Checkout */}
-      <div style={styles.rightPanel} className="glass-panel">
-        <div style={styles.cartHeader}>
-          <ShoppingBag size={20} color="#f97316" />
-          <h2 style={styles.cartTitle}>Current Order</h2>
-          <span className="badge badge-info">{cart.length} items</span>
-        </div>
-
-        {/* Cart Item List */}
-        <div style={styles.cartList}>
-          {cart.length === 0 ? (
-            <div style={styles.emptyCart}>
-              <Sparkles size={36} color="#64748b" />
-              <p>Scan barcode or click items to add to cart</p>
-            </div>
-          ) : (
-            cart.map((item) => (
-              <div key={item.productId} style={styles.cartItem}>
-                <div>
-                  <div style={styles.cartItemName}>{item.nameEn}</div>
-                  <div style={styles.cartItemHindi}>{item.nameHi}</div>
-                  <div style={styles.cartItemPrice}>₹{item.salePrice} / unit</div>
-                </div>
-
-                <div style={styles.qtyControls}>
-                  <button
-                    onClick={() => updateQty(item.productId, -1)}
-                    style={styles.qtyBtn}
-                  >
-                    <Minus size={12} />
-                  </button>
-                  <span style={styles.qtyValue}>{item.qty}</span>
-                  <button
-                    onClick={() => updateQty(item.productId, 1)}
-                    style={styles.qtyBtn}
-                  >
-                    <Plus size={12} />
-                  </button>
-                  <button
-                    onClick={() => removeFromCart(item.productId)}
-                    style={styles.deleteBtn}
-                  >
-                    <Trash2 size={14} color="#f43f5e" />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Checkout Form */}
-        <form onSubmit={handleCheckout} style={styles.checkoutSection}>
-          {error && (
-            <div style={styles.errorBox}>
-              <span>⚠️ {error}</span>
-              <button onClick={() => setError('')} style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', fontWeight: '700', fontSize: '1rem' }}>✕</button>
-            </div>
-          )}
-
-          <div className="input-group" style={{ marginBottom: '0.6rem' }}>
-            <label>Customer Name</label>
-            <input
-              type="text"
-              className="input-control"
-              placeholder="Ramesh Sharma (or Guest)"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-            />
-          </div>
-
-          <div className="input-group" style={{ marginBottom: '0.6rem' }}>
-            <label>Phone Number (WhatsApp Receipt)</label>
-            <input
-              type="text"
-              className="input-control"
-              placeholder="9829012345"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          </div>
-
-          {/* Payment Mode Selector */}
-          <div className="input-group" style={{ marginBottom: '0.8rem' }}>
-            <label>Payment Method</label>
-            <div style={styles.paymentGrid}>
-              {[
-                { id: 'UPI', label: 'UPI QR', icon: QrCode },
-                { id: 'CASH', label: 'Cash', icon: Banknote },
-                { id: 'CARD', label: 'Card', icon: CreditCard },
-                { id: 'KHATA', label: 'Khata', icon: BookOpen },
-              ].map((mode) => {
-                const Icon = mode.icon;
-                const isSelected = paymentMode === mode.id;
-                return (
-                  <button
-                    key={mode.id}
-                    type="button"
-                    style={{
-                      ...styles.paymentBtn,
-                      ...(isSelected ? styles.paymentBtnActive : {}),
-                    }}
-                    onClick={() => setPaymentMode(mode.id)}
-                  >
-                    <Icon size={16} />
-                    <span>{mode.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* UPI Dynamic QR Code Box with 1-TAP confirm */}
-          {paymentMode === 'UPI' && subtotal > 0 && (
-            <div style={styles.upiBox} className="animate-fade-in">
-              {/* Header */}
-              <div style={styles.upiMetaHeader}>
-                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Scan &amp; Pay via UPI</span>
-                <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>
-                  {upiId}
-                </span>
-              </div>
-
-              {/* QR Code */}
-              <div style={{ margin: '0.6rem 0', display: 'flex', justifyContent: 'center' }}>
-                <QRCode
-                  value={`upi://pay?pa=${upiId}&pn=Shree%20Pooja%20Ghr&am=${subtotal.toFixed(2)}&cu=INR&tn=Bill%20Shree%20Pooja%20Ghr`}
-                  size={150}
-                />
-              </div>
-
-              {/* Amount display */}
-              <div style={styles.upiAmountRow}>
-                <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Amount to collect:</span>
-                <span style={{ fontSize: '1.2rem', fontWeight: '800', color: '#f97316' }}>₹{subtotal.toFixed(2)}</span>
-              </div>
-
-              <div style={styles.upiAppsHint}>
-                <span>GPay</span> • <span>PhonePe</span> • <span>Paytm</span> • <span>BHIM</span>
-              </div>
-
-              {/* Divider */}
-              <div style={styles.upiDivider}>
-                <span style={styles.upiDividerText}>Customer ne pay kiya? Tap karo 👇</span>
-              </div>
-
-              {/* ✅ ONE-TAP Complete Button */}
-              <button
-                type="submit"
-                style={{
-                  ...styles.upiConfirmBtn,
-                  ...(loading ? styles.upiConfirmBtnLoading : {}),
-                }}
-                disabled={loading}
-              >
-                {loading ? (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
-                    <span style={styles.spinner}></span>
-                    Processing...
-                  </span>
-                ) : (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '1.2rem' }}>✅</span>
-                    UPI Payment Received — Complete Sale
-                  </span>
-                )}
-              </button>
-            </div>
-          )}
-
-
-          {/* Cash Received Calculator */}
-          {paymentMode === 'CASH' && (
-            <div style={styles.cashBox} className="animate-fade-in">
-              <div className="input-group" style={{ marginBottom: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem' }}>Cash Received (₹)</label>
-                <input
-                  type="number"
-                  className="input-control"
-                  placeholder="e.g. 500"
-                  value={cashGiven}
-                  onChange={(e) => setCashGiven(e.target.value)}
-                />
-              </div>
-
-              {cashGiven && parseFloat(cashGiven) >= subtotal && (
-                <div style={styles.changeReturnRow}>
-                  <span>Change to Return:</span>
-                  <strong style={{ color: '#10b981', fontSize: '1.1rem' }}>
-                    ₹{(parseFloat(cashGiven) - subtotal).toFixed(2)}
-                  </strong>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Khata Ledger Notice */}
-          {paymentMode === 'KHATA' && (
-            <div style={styles.khataNotice} className="animate-fade-in">
-              📖 Invoice will be marked as Due / Khata balance under customer account.
-            </div>
-          )}
-
-          {/* Total Summary */}
-          <div style={styles.totalRow}>
-            <span>Grand Total</span>
-            <span style={styles.totalAmount}>₹{subtotal.toFixed(2)}</span>
-          </div>
-
-          {/* Bottom Complete Sale — hidden for UPI (UPI has its own button inside QR card) */}
-          {paymentMode !== 'UPI' && (
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ width: '100%', padding: '0.85rem', fontSize: '1.05rem' }}
-              disabled={cart.length === 0 || loading}
-            >
-              {loading ? 'Processing Checkout...' : `Complete Sale (₹${subtotal.toFixed(2)})`}
-            </button>
-          )}
-
-          {/* UPI with empty cart notice */}
-          {paymentMode === 'UPI' && cart.length > 0 && subtotal === 0 && (
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ width: '100%', padding: '0.85rem', fontSize: '1.05rem' }}
-              disabled={loading}
-            >
-              Complete Sale
-            </button>
-          )}
-        </form>
-      </div>
-
-      {/* Completed Invoice Modal / Printable Receipt */}
-      {completedInvoice && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.receiptModal} className="glass-panel animate-fade-in">
-            <div style={styles.receiptHeader}>
-              <CheckCircle2 size={48} color="#10b981" />
-              <h2 style={{ marginTop: '0.5rem' }}>Sale Successful!</h2>
-              <span className="badge badge-success">
-                Invoice: {completedInvoice.invoiceNo}
-              </span>
-            </div>
-
-            <div style={styles.receiptBody}>
-              <div style={styles.receiptRow}>
-                <span>Customer:</span>
-                <strong>{completedInvoice.customerName}</strong>
-              </div>
-              <div style={styles.receiptRow}>
-                <span>Total Amount:</span>
-                <strong>₹{completedInvoice.total.toFixed(2)}</strong>
-              </div>
-              <div style={styles.receiptRow}>
-                <span>Profit Locked:</span>
-                <strong style={{ color: '#10b981' }}>₹{completedInvoice.profit.toFixed(2)}</strong>
-              </div>
-              <div style={styles.receiptRow}>
-                <span>WhatsApp Receipt:</span>
-                <span className="badge badge-info">{completedInvoice.waStatus}</span>
-              </div>
-            </div>
-
-            <div style={styles.modalActions}>
-              <button
-                onClick={() => window.print()}
-                className="btn btn-secondary"
-              >
-                <Printer size={16} /> Print Bill
-              </button>
-              <button
-                onClick={() => setCompletedInvoice(null)}
-                className="btn btn-primary"
-              >
-                Next Order
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
+    </>
   );
 }
 
 const styles = {
-  posContainer: {
-    display: 'flex',
-    gap: '1.5rem',
-    height: 'calc(100vh - 3rem)',
-  },
   leftPanel: {
     flex: 1,
     display: 'flex',
@@ -583,7 +563,7 @@ const styles = {
     flex: 1,
     background: 'transparent',
     border: 'none',
-    color: '#fff',
+    color: 'var(--text-primary)',
     fontSize: '1rem',
     outline: 'none',
   },
@@ -595,56 +575,66 @@ const styles = {
   },
   productGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 270px), 1fr))',
     gap: '1rem',
+    overflowY: 'auto',
+    flex: 1,
+    minWidth: 0,
+    paddingRight: '0.2rem',
+    alignContent: 'start',
   },
   productCard: {
     cursor: 'pointer',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
+    minWidth: 0,
+    minHeight: '360px',
+    padding: '1.35rem',
+    background: '#ffffff',
+    borderRadius: '24px',
+    boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
+    border: '1px solid #e2e8f0',
+    transition: 'all 0.2s ease',
   },
   outOfStockCard: {
     opacity: 0.5,
     cursor: 'not-allowed',
+    filter: 'grayscale(100%)',
   },
-  productMeta: {
+  cardImageBox: {
+    background: '#f5f3ed',
+    borderRadius: '16px',
+    height: '160px',
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '0.5rem',
+    justifyContent: 'center',
+    marginBottom: '1rem',
+    padding: '1rem',
+    position: 'relative',
   },
-  unitBadge: {
-    fontSize: '0.75rem',
-    color: '#64748b',
-  },
-  productTitle: {
-    fontSize: '0.95rem',
-    fontWeight: '700',
-    color: '#f8fafc',
-  },
-  hindiName: {
-    fontSize: '0.82rem',
-    color: '#94a3b8',
-    marginBottom: '0.8rem',
-  },
-  productFooter: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  priceTag: {
-    fontSize: '1.1rem',
+  cardTitle: {
+    fontSize: '1.15rem',
     fontWeight: '800',
-    color: '#f97316',
+    color: '#0f172a',
+    margin: 0,
+    lineHeight: 1.35,
+    overflowWrap: 'anywhere',
+    whiteSpace: 'normal',
   },
-  rightPanel: {
-    width: '380px',
-    borderRadius: '20px',
-    padding: '1.25rem',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
+  cardSubtitle: {
+    fontSize: '0.92rem',
+    color: '#647179',
+    marginTop: '0.35rem',
+    lineHeight: 1.55,
+    overflowWrap: 'anywhere',
+    whiteSpace: 'normal',
+  },
+  selectSizeHeader: {
+    fontSize: '0.85rem',
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: '0.6rem',
   },
   cartHeader: {
     display: 'flex',
@@ -701,7 +691,7 @@ const styles = {
   qtyBtn: {
     background: '#334155',
     border: 'none',
-    color: '#fff',
+    color: 'var(--text-primary)',
     width: '24px',
     height: '24px',
     borderRadius: '6px',
@@ -774,12 +764,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 9999,
-  },
-  receiptModal: {
-    width: '360px',
-    borderRadius: '20px',
-    padding: '2rem 1.5rem',
-    textAlign: 'center',
   },
   receiptHeader: {
     marginBottom: '1.5rem',
@@ -907,8 +891,7 @@ const styles = {
     height: '16px',
     borderRadius: '50%',
     border: '2px solid rgba(255,255,255,0.3)',
-    borderTopColor: '#fff',
+    borderTopColor: '#f97316',
     animation: 'spin 0.7s linear infinite',
   },
 };
-

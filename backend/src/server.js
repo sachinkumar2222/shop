@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import './jobs/whatsapp.worker.js'; // Start worker process
 
 const prisma = new PrismaClient();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 async function startServer() {
   try {

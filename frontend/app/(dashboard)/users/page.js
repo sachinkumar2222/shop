@@ -71,8 +71,38 @@ export default function UsersPage() {
   };
 
   return (
+    <>
+      <style>{`
+        .users-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .users-modal {
+          width: 420px;
+          border-radius: 20px;
+          padding: 2rem;
+          max-height: 100vh;
+          overflow-y: auto;
+        }
+        @media (max-width: 768px) {
+          .users-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+          }
+          .users-header button {
+            width: 100%;
+          }
+          .users-modal {
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 0 !important;
+          }
+        }
+      `}</style>
     <div style={styles.container}>
-      <div style={styles.header}>
+      <div className="users-header">
         <div>
           <h1 style={styles.title}>Staff & Cashier Management</h1>
           <p style={styles.subtitle}>Create & manage cashier accounts and system permissions</p>
@@ -89,8 +119,8 @@ export default function UsersPage() {
       </div>
 
       {/* Users Table */}
-      <div style={styles.tableContainer} className="glass-panel">
-        <table style={styles.table}>
+      <div className="table-container table-responsive">
+        <table className="custom-table">
           <thead>
             <tr>
               <th>Staff Name</th>
@@ -107,7 +137,7 @@ export default function UsersPage() {
                   <strong style={{ fontSize: '0.95rem' }}>{u.name}</strong>
                 </td>
                 <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#94a3b8' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#536168' }}>
                     <Mail size={14} />
                     <span>{u.email}</span>
                   </div>
@@ -144,9 +174,9 @@ export default function UsersPage() {
       {/* Add Cashier Modal */}
       {showModal && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modal} className="glass-panel animate-fade-in">
+          <div className="users-modal glass-panel animate-fade-in">
             <h2>Add New Cashier / Staff</h2>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1rem' }}>
+            <p style={{ fontSize: '0.88rem', color: '#536168', marginBottom: '1rem' }}>
               Create login credentials for your store salesperson
             </p>
 
@@ -238,6 +268,7 @@ export default function UsersPage() {
         </div>
       )}
     </div>
+    </>
   );
 }
 
@@ -258,7 +289,7 @@ const styles = {
   },
   subtitle: {
     fontSize: '0.85rem',
-    color: '#94a3b8',
+    color: '#536168',
   },
   tableContainer: {
     borderRadius: '18px',
@@ -311,8 +342,8 @@ const styles = {
     marginTop: '1.25rem',
   },
   errorBox: {
-    background: 'rgba(244, 63, 94, 0.15)',
-    color: '#f43f5e',
+    background: '#fff0f0',
+    color: '#a72e3e',
     padding: '0.5rem',
     borderRadius: '8px',
     fontSize: '0.85rem',

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as productController from '../controllers/product.controller.js';
 import { validateProduct } from '../validators/product.validator.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
+import { upload } from '../middleware/upload.middleware.js';
 
 const router = Router();
 
@@ -14,5 +15,7 @@ router.get('/:id', authenticate, productController.getProductById);
 // Writes (Admin only)
 router.post('/', authenticate, authorize('ADMIN'), validateProduct, productController.createProduct);
 router.put('/:id', authenticate, authorize('ADMIN'), validateProduct, productController.updateProduct);
+router.post('/:id/image', authenticate, authorize('ADMIN'), upload.single('image'), productController.uploadProductImage);
+router.delete('/:id', authenticate, authorize('ADMIN'), productController.deleteProduct);
 
 export default router;

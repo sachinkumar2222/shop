@@ -51,6 +51,33 @@ export default function CustomersPage() {
   };
 
   return (
+    <>
+      <style>{`
+        .cust-export-card {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .cust-export-controls {
+          display: flex;
+          gap: 0.8rem;
+          align-items: center;
+        }
+        @media (max-width: 768px) {
+          .cust-export-card {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+          }
+          .cust-export-controls {
+            flex-direction: column;
+            width: 100%;
+          }
+          .cust-export-controls select, .cust-export-controls button {
+            width: 100% !important;
+          }
+        }
+      `}</style>
     <div style={styles.container}>
       <div style={styles.header}>
         <div>
@@ -60,20 +87,20 @@ export default function CustomersPage() {
       </div>
 
       {/* WhatsApp Export Card */}
-      <div style={styles.exportCard} className="glass-panel animate-fade-in">
+      <div style={styles.exportCard} className="cust-export-card glass-panel animate-fade-in">
         <div style={styles.exportHeader}>
           <div style={styles.iconBox}>
             <Sparkles size={24} color="#eab308" />
           </div>
           <div>
             <h3>WhatsApp Marketing CSV Export</h3>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+            <p style={{ fontSize: '0.88rem', color: '#536168' }}>
               Download customer segments formatted for bulk WhatsApp campaign software.
             </p>
           </div>
         </div>
 
-        <div style={styles.exportControls}>
+        <div className="cust-export-controls">
           <select
             className="input-control"
             style={{ width: '220px' }}
@@ -92,8 +119,8 @@ export default function CustomersPage() {
       </div>
 
       {/* Customer Directory Table */}
-      <div style={styles.tableContainer} className="glass-panel">
-        <table style={styles.table}>
+      <div className="table-container table-responsive">
+        <table className="custom-table">
           <thead>
             <tr>
               <th>Customer Name</th>
@@ -119,7 +146,7 @@ export default function CustomersPage() {
                   <span className="badge badge-info">{c.totalOrders} orders</span>
                 </td>
                 <td>
-                  <strong style={{ fontSize: '1.05rem', color: '#10b981' }}>
+                  <strong style={{ fontSize: '1.05rem', color: '#187653' }}>
                     ₹{Number(c.lifetimeSpend).toFixed(2)}
                   </strong>
                 </td>
@@ -134,6 +161,7 @@ export default function CustomersPage() {
         </table>
       </div>
     </div>
+    </>
   );
 }
 
@@ -154,14 +182,11 @@ const styles = {
   },
   subtitle: {
     fontSize: '0.85rem',
-    color: '#94a3b8',
+    color: '#536168',
   },
   exportCard: {
     padding: '1.5rem',
     borderRadius: '20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.08) 0%, rgba(249, 115, 22, 0.05) 100%)',
     border: '1px solid rgba(234, 179, 8, 0.2)',
   },
