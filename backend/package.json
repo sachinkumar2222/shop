@@ -1,7 +1,7 @@
 {
-  "name": "shree-pooja-ghr-backend",
+  "name": "shree-pooja-ghar-backend",
   "version": "1.0.0",
-  "description": "Shree Pooja Ghr POS and Inventory Backend",
+  "description": "Shree Pooja Ghar POS and Inventory Backend",
   "main": "src/server.js",
   "type": "module",
   "scripts": {

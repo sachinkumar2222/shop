@@ -8,7 +8,8 @@ const checkoutItemSchema = z.object({
   // The current multi-unit cart sends qtyInUnit. Keep qty accepted for older clients.
   qtyInUnit: z.number().positive().optional(),
   qty: z.number().positive().optional(),
-  salePrice: z.number().positive('Sale price must be positive'),
+  salePrice: z.number().nonnegative('Sale price cannot be negative'),
+  regularPrice: z.number().nonnegative('Regular price cannot be negative').optional(),
 }).superRefine((item, ctx) => {
   if (item.qtyInUnit === undefined && item.qty === undefined) {
     ctx.addIssue({

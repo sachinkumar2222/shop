@@ -29,7 +29,7 @@ export const generateReceiptPDF = async (invoice) => {
   const items = Array.isArray(invoice.items) ? invoice.items : [];
   const paymentLabels = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card', KHATA: 'Khata' };
   const paymentMode = paymentLabels[String(invoice.paymentMode || '').toUpperCase()] || 'Other';
-  const storeName = escapeHtml(process.env.STORE_NAME || 'Shree Pooja Ghr');
+  const storeName = escapeHtml(process.env.STORE_NAME || 'Shree Pooja Ghar');
   const storeAddress = escapeHtml(process.env.STORE_ADDRESS || 'Ajmer, Rajasthan, India');
   const storePhone = process.env.STORE_PHONE ? escapeHtml(process.env.STORE_PHONE) : '';
   const customerName = escapeHtml(invoice.customerName || 'Guest Customer');
@@ -192,7 +192,7 @@ export const generateThermalReceiptHTML = (invoice) => {
     timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit',
   });
   const total = Number(invoice.totalAmount || 0);
-  const storeName = escapeHtml(process.env.STORE_NAME || 'Shree Pooja Ghr');
+  const storeName = escapeHtml(process.env.STORE_NAME || 'Shree Pooja Ghar');
   const storeAddress = process.env.STORE_ADDRESS
     ? `<div>${escapeHtml(process.env.STORE_ADDRESS)}</div>`
     : '<div>Ajmer, Rajasthan</div>';

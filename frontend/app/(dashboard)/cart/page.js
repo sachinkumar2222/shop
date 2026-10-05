@@ -35,16 +35,61 @@ export default function DedicatedCartPage() {
   const [completedInvoice, setCompletedInvoice] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
+    let savedCartItems = [];
     // Load cart from localStorage shared state
     try {
       const savedCart = localStorage.getItem('pos_cart');
       if (savedCart) {
-        setCart(JSON.parse(savedCart));
+        savedCartItems = JSON.parse(savedCart);
+        setCart(savedCartItems);
       }
     } catch (e) {
       console.error(e);
     }
+
+    if (savedCartItems.length > 0) {
+      apiFetch('/products')
+        .then((response) => {
+          const products = response.data || [];
+          const repricedCart = savedCartItems.map((item) => {
+            const product = products.find((entry) => entry.id === item.productId);
+            if (!product) return item;
+
+            const productUnits = product.units || [];
+            const unit = productUnits.find((entry) => entry.id === item.unitId)
+              || productUnits.find((entry) => entry.nameEn === item.unitName)
+              || productUnits.find((entry) => entry.isSellUnit)
+              || productUnits[0];
+            const regularPrice = Number(
+              unit?.sellingPrice
+              ?? product.batches?.[0]?.sellingPrice
+              ?? item.regularPrice
+              ?? item.salePrice
+              ?? 0
+            );
+            const discountPercent = Number(product.discountPercent || 0);
+            const salePrice = Number(
+              unit?.discountedPrice
+              ?? (regularPrice * (1 - discountPercent / 100)).toFixed(2)
+            );
+
+            return { ...item, regularPrice, salePrice, discountPercent };
+          });
+
+          if (!cancelled) {
+            setCart(repricedCart);
+            localStorage.setItem('pos_cart', JSON.stringify(repricedCart));
+          }
+        })
+        .catch((error) => console.error('Could not refresh cart prices:', error));
+    }
+
     fetchUpiAccounts();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const syncCart = (newCart) => {
@@ -120,6 +165,7 @@ export default function DedicatedCartPage() {
         unitId: item.unitId,
         qtyInUnit: item.qtyInUnit,
         salePrice: Number(item.salePrice),
+        regularPrice: Number(item.regularPrice ?? item.salePrice),
       }));
 
       const idempotencyKey = `cart-page-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -429,9 +475,15 @@ export default function DedicatedCartPage() {
                           <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem', overflowWrap: 'anywhere' }}>{item.nameEn}</div>
                           <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
                             {item.nameHi} • <span style={{ color: '#c2410c', fontWeight: 600 }}>{item.unitName}</span>
+                            {Number(item.discountPercent) > 0 && <span style={{ marginLeft: 6, color: '#b54708', fontWeight: 700 }}>{Number(item.discountPercent)}% off</span>}
                           </div>
                         </td>
-                        <td style={{ color: '#334155', fontWeight: 600 }}>₹{item.salePrice}</td>
+                        <td style={{ color: '#334155', fontWeight: 600 }}>
+                          {Number(item.regularPrice) > Number(item.salePrice) && (
+                            <div style={{ color: '#94a3b8', fontSize: '0.78rem', fontWeight: 500, textDecoration: 'line-through' }}>₹{Number(item.regularPrice).toFixed(2)}</div>
+                          )}
+                          <span style={{ color: Number(item.regularPrice) > Number(item.salePrice) ? '#c2410c' : '#334155' }}>₹{Number(item.salePrice).toFixed(2)}</span>
+                        </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <button
@@ -594,7 +646,7 @@ export default function DedicatedCartPage() {
                   <div style={{ margin: '0.5rem 0', display: 'flex', justifyContent: 'center' }}>
                     {selectedUpiId ? (
                       <QRCode
-                        value={`upi://pay?pa=${selectedUpiId}&pn=Shree%20Pooja%20Ghr&am=${subtotal.toFixed(2)}&cu=INR&tn=Bill%20Shree%20Pooja%20Ghr`}
+                        value={`upi://pay?pa=${selectedUpiId}&pn=Shree%20Pooja%20Ghar&am=${subtotal.toFixed(2)}&cu=INR&tn=Bill%20Shree%20Pooja%20Ghar`}
                         size={140}
                       />
                     ) : (

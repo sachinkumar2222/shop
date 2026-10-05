@@ -153,6 +153,7 @@ export default function POSPage() {
           nameEn: product.nameEn,
           nameHi: product.nameHi,
           salePrice: Number(targetUnit.salePrice),
+          regularPrice: Number(targetUnit.regularPrice ?? targetUnit.sellingPrice ?? targetUnit.salePrice),
           qtyInUnit: 1,
           allowDecimalQty: Boolean(product.allowDecimalQty),
           totalStockBase: totalStock,
@@ -221,6 +222,7 @@ export default function POSPage() {
           qtyInUnit: item.qtyInUnit,
           qty: item.qtyInUnit,
           salePrice: item.salePrice,
+          regularPrice: item.regularPrice,
         })),
       };
 
@@ -413,15 +415,23 @@ export default function POSPage() {
               ? {
                   ...activeUnitObj,
                   unitName: activeUnitObj.unitName || activeUnitObj.nameEn || product.baseUnit,
-                  salePrice: activeUnitObj.salePrice !== undefined ? activeUnitObj.salePrice : activeUnitObj.sellingPrice,
+                  regularPrice: Number(activeUnitObj.sellingPrice ?? activeUnitObj.salePrice ?? 0),
+                  salePrice: Number(activeUnitObj.discountedPrice ?? (
+                    Number(activeUnitObj.sellingPrice ?? activeUnitObj.salePrice ?? 0)
+                    * (1 - Number(product.discountPercent || 0) / 100)
+                  )),
                 }
               : {
                   unitName: product.unit || product.baseUnit || 'Pcs',
-                  salePrice: product.batches?.[0]?.sellingPrice || 0,
+                  regularPrice: Number(product.batches?.[0]?.sellingPrice || 0),
+                  salePrice: Number(product.batches?.[0]?.sellingPrice || 0) * (1 - Number(product.discountPercent || 0) / 100),
                   factorToBase: 1,
                 };
 
             const unitPrice = Number(activeUnit.salePrice || 0);
+            const regularUnitPrice = Number(activeUnit.regularPrice ?? unitPrice);
+            const discountPercent = Number(product.discountPercent || 0);
+            const hasDiscount = discountPercent > 0 && regularUnitPrice > unitPrice;
 
             return (
               <div
@@ -443,6 +453,13 @@ export default function POSPage() {
                   {isOutOfStock && (
                     <div style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
                       <span className="badge badge-danger">Out of Stock</span>
+                    </div>
+                  )}
+                  {hasDiscount && (
+                    <div style={{ position: 'absolute', top: '1rem', left: '1rem' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '0.35rem 0.65rem', color: '#fff', background: '#c2410c', fontSize: '0.78rem', fontWeight: 800, letterSpacing: '0.02em', boxShadow: '0 3px 10px rgba(124,45,18,0.2)' }}>
+                        {discountPercent}% OFF
+                      </span>
                     </div>
                   )}
                 </div>
@@ -526,8 +543,15 @@ export default function POSPage() {
                       <ShoppingBag size={16} /> {hasUnits || !product.units?.length ? 'Add to cart' : 'No selling unit'}
                     </button>
                     
-                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1f2a2e' }}>
-                      ₹{unitPrice.toFixed(2)}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.1rem' }}>
+                      {hasDiscount && (
+                        <span style={{ color: '#78838a', fontSize: '0.85rem', textDecoration: 'line-through' }}>
+                          ₹{regularUnitPrice.toFixed(2)}
+                        </span>
+                      )}
+                      <span style={{ fontSize: '1.25rem', fontWeight: 800, color: hasDiscount ? '#c2410c' : '#1f2a2e' }}>
+                        ₹{unitPrice.toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -603,6 +627,7 @@ const styles = {
     filter: 'grayscale(100%)',
   },
   cardImageBox: {
+    position: 'relative',
     background: '#f5f3ed',
     borderRadius: '16px',
     height: '160px',

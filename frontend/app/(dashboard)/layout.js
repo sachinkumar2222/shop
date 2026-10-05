@@ -29,7 +29,7 @@ export default function DashboardLayout({ children }) {
     return (
       <div style={styles.loadingContainer}>
         <div style={styles.spinner}></div>
-        <p>Loading Shree Pooja Ghr Dashboard...</p>
+        <p>Loading Shree Pooja Ghar Dashboard...</p>
       </div>
     );
   }

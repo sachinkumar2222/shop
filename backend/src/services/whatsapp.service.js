@@ -131,7 +131,7 @@ const buildReceiptCaption = (invoice) => {
     timeStyle: 'short',
   });
 
-  return `🙏 *Shree Pooja Ghr - Purchase invoice*
+  return `🙏 *Shree Pooja Ghar - Purchase invoice*
 Invoice: ${invoice.invoiceNo}
 Date: ${date}
 Customer: ${invoice.customerName || 'Guest Customer'}

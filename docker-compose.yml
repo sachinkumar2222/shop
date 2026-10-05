@@ -46,7 +46,7 @@ services:
       DATABASE_URL: "postgresql://postgres:postgrespassword@postgres:5432/shreepooja?schema=public"
       DIRECT_URL: "postgresql://postgres:postgrespassword@postgres:5432/shreepooja?schema=public"
       REDIS_URL: "redis://redis:6379"
-      JWT_SECRET: "shreepoojaghr-super-secret-jwt-key-2024"
+      JWT_SECRET: "shreepoojaghar-super-secret-jwt-key-2024"
       JWT_EXPIRES_IN: "30d"
       WHATSAPP_PROVIDER: "opensource"
       CORS_ORIGIN: "*"

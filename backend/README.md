@@ -1,4 +1,4 @@
-# 🙏 Shree Pooja Ghr — Backend API
+# 🙏 Shree Pooja Ghar — Backend API
 
 **श्री पूजा घर | POS, Inventory & WhatsApp Automation System**
 

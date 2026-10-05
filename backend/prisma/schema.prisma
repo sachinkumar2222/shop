@@ -31,6 +31,7 @@ model Product {
   allowDecimalQty   Boolean        @default(false) @map("allow_decimal_qty")
   lowStockThreshold Decimal        @default(0) @db.Decimal(12, 3) @map("low_stock_threshold")
   totalStockBase    Decimal        @default(0) @db.Decimal(12, 3) @map("total_stock_base")
+  discountPercent   Decimal        @default(0) @db.Decimal(5, 2) @map("discount_percent")
   minAlertQty       Int            @default(0) @map("min_alert_qty")
   units             ProductUnit[]
   batches           ProductBatch[]

@@ -5,7 +5,7 @@ const router = Router();
 router.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'Shree Pooja Ghr API is running',
+    message: 'Shree Pooja Ghar API is running',
   });
 });
 

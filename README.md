@@ -1,4 +1,4 @@
-# 🪔 श्री पूजा घर (Shree Pooja Ghr) — POS, Inventory & WhatsApp Automation System
+# 🪔 श्री पूजा घर (Shree Pooja Ghar) — POS, Inventory & WhatsApp Automation System
 
 [![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-16.3-black?logo=next.js&logoColor=white)](https://nextjs.org/)
@@ -147,7 +147,7 @@ npm run dev
 | `PORT` | `3001` | Express server port |
 | `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/shreepooja` | PostgreSQL connection string |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection string |
-| `JWT_SECRET` | `shreepoojaghr-super-secret-jwt-key` | Secret key for JWT auth tokens |
+| `JWT_SECRET` | `shreepoojaghar-super-secret-jwt-key` | Secret key for JWT auth tokens |
 | `WHATSAPP_PROVIDER` | `opensource` | WhatsApp service mode |
 | `CORS_ORIGIN` | `*` | Allowed CORS origins |
 

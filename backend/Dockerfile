@@ -1,4 +1,4 @@
-# Backend Dockerfile for Shree Pooja Ghr POS System
+# Backend Dockerfile for Shree Pooja Ghar POS System
 FROM node:20-slim
 
 # Install Chromium and dependencies for puppeteer / whatsapp-web.js

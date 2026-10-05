@@ -7,13 +7,13 @@ const FORBIDDEN_REGEX = /cost|profit|margin|vendor|purchase|cogs/i;
 
 const PRODUCT_WHITELIST = [
   'id', 'barcode', 'nameEn', 'nameHi', 'imageUrl', 'categoryId', 'category',
-  'baseUnit', 'allowDecimalQty', 'lowStockThreshold', 'totalStockBase',
+  'baseUnit', 'allowDecimalQty', 'lowStockThreshold', 'totalStockBase', 'discountPercent',
   'totalAvailableStock', 'formattedStock', 'units', 'createdAt', 'updatedAt',
 ];
 
 const UNIT_WHITELIST = [
   'id', 'productId', 'nameEn', 'nameHi', 'factorToBase', 'isSellUnit',
-  'sellingPrice', 'priceOverride', 'minQty', 'qtyStep', 'barcode', 'sortOrder',
+  'sellingPrice', 'discountedPrice', 'priceOverride', 'minQty', 'qtyStep', 'barcode', 'sortOrder',
 ];
 
 const INVOICE_WHITELIST = [

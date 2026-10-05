@@ -87,7 +87,7 @@ export const checkout = async ({ idempotencyKey, customerName, phone, paymentMod
 
           // 1. Pessimistic Row Lock on Products in deterministic order (ORDER BY id ASC)
           const lockedProducts = await tx.$queryRaw`
-            SELECT id, name_en, base_unit, allow_decimal_qty, low_stock_threshold, total_stock_base
+            SELECT id, name_en, base_unit, allow_decimal_qty, low_stock_threshold, total_stock_base, discount_percent
             FROM products
             WHERE id IN (${Prisma.join(rawProductIds)})
             ORDER BY id ASC
@@ -114,6 +114,7 @@ export const checkout = async ({ idempotencyKey, customerName, phone, paymentMod
               allowDecimalQty: p.allow_decimal_qty,
               lowStockThreshold: p.low_stock_threshold,
               totalStockBase: p.total_stock_base,
+              discountPercent: p.discount_percent,
               units: units.filter((u) => u.productId === p.id),
             };
           }
@@ -177,9 +178,15 @@ export const checkout = async ({ idempotencyKey, customerName, phone, paymentMod
                 unitPriceDec = new Decimal(unit.sellingPrice.toString());
               }
             }
-            if (unitPriceDec.eq(0) && item.salePrice) {
-              unitPriceDec = new Decimal(item.salePrice.toString());
+            if (unitPriceDec.eq(0) && item.salePrice !== undefined) {
+              const fallbackPrice = item.regularPrice ?? item.salePrice;
+              unitPriceDec = new Decimal(fallbackPrice.toString());
             }
+            const discountPercentDec = new Decimal(product.discountPercent?.toString() || '0');
+            unitPriceDec = unitPriceDec
+              .mul(new Decimal(100).minus(discountPercentDec))
+              .div(100)
+              .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
             const lineTotalDec = unitPriceDec.mul(qtyInUnitDec).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
