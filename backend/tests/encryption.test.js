@@ -13,7 +13,7 @@ import {
 
 describe('Data-Crypto and End-to-End Encryption Suite', () => {
   beforeAll(() => {
-    process.env.PII_ENCRYPTION_KEY = '8f8815e6c8c4c6caef1209be3e4549e1d138864eacdcfb921954e3e481a230b6';
+    process.env.PII_ENCRYPTION_KEY = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   });
 
   describe('Core AES-256-GCM Encryption', () => {

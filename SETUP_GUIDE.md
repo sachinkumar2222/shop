@@ -42,7 +42,7 @@ The project relies on environment files for configuration. If they are missing, 
 DATABASE_URL="postgresql://postgres:postgres@postgres:5432/shreepooja?schema=public"
 
 # JWT Secret for authentication
-JWT_SECRET="shreepoojaghr-super-secret-jwt-key-2024"
+JWT_SECRET="<generate-a-long-random-secret>"
 
 # Environment
 NODE_ENV="development"
@@ -52,7 +52,7 @@ PORT="3001"
 ### Frontend (`frontend/.env.local`)
 ```env
 # URL pointing to the local backend API
-NEXT_PUBLIC_API_URL="http://localhost:3001/api/v1"
+BACKEND_URL="http://localhost:3001"
 ```
 
 ## 🔄 Supabase (Cloud Database) Integration

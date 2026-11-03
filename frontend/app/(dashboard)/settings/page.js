@@ -24,7 +24,7 @@ export default function SettingsPage() {
   const fetchAccounts = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/v1/upi', {
+      const res = await fetch('/api/v1/upi', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await res.json();
@@ -40,7 +40,7 @@ export default function SettingsPage() {
   const fetchWaStatus = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/v1/whatsapp/status', {
+      const res = await fetch('/api/v1/whatsapp/status', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await res.json();
@@ -58,7 +58,7 @@ export default function SettingsPage() {
 
     // Load saved Supabase credentials
     const token = localStorage.getItem('token');
-    fetch('http://localhost:3001/api/v1/dbsync/credentials', {
+    fetch('/api/v1/dbsync/credentials', {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(r => r.json())
@@ -77,7 +77,7 @@ export default function SettingsPage() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/v1/upi', {
+      const res = await fetch('/api/v1/upi', {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -99,7 +99,7 @@ export default function SettingsPage() {
   const handleToggle = async (id, currentStatus) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3001/api/v1/upi/${id}/toggle`, {
+      const res = await fetch(`/api/v1/upi/${id}/toggle`, {
         method: 'PATCH',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -120,7 +120,7 @@ export default function SettingsPage() {
     if (!window.confirm('Are you sure you want to delete this UPI Account?')) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3001/api/v1/upi/${id}`, {
+      const res = await fetch(`/api/v1/upi/${id}`, {
         method: 'DELETE',
         headers: { 
           'Authorization': `Bearer ${token}`
@@ -141,7 +141,7 @@ export default function SettingsPage() {
     setWaLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/v1/whatsapp/pair', {
+      const res = await fetch('/api/v1/whatsapp/pair', {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -164,7 +164,7 @@ export default function SettingsPage() {
     setWaLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/v1/whatsapp/logout', {
+      const res = await fetch('/api/v1/whatsapp/logout', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -186,7 +186,7 @@ export default function SettingsPage() {
     setDbSyncStatus(null);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/v1/dbsync/credentials', {
+      const res = await fetch('/api/v1/dbsync/credentials', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ supabaseDirectUrl: supabaseUrl })
@@ -208,7 +208,7 @@ export default function SettingsPage() {
     setDbSyncStatus({ type: 'info', message: '🔄 Testing connection...' });
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/v1/dbsync/test', {
+      const res = await fetch('/api/v1/dbsync/test', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ supabaseDirectUrl: supabaseUrl })
@@ -230,7 +230,7 @@ export default function SettingsPage() {
     setDbSyncStatus({ type: 'info', message: '🔄 Pushing data to Supabase... (this may take a minute)' });
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/v1/dbsync/push', {
+      const res = await fetch('/api/v1/dbsync/push', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ supabaseDirectUrl: supabaseUrl })
@@ -253,7 +253,7 @@ export default function SettingsPage() {
     setDbSyncStatus({ type: 'info', message: '🔄 Pulling data from Supabase... (this may take a minute)' });
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/v1/dbsync/pull', {
+      const res = await fetch('/api/v1/dbsync/pull', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ supabaseDirectUrl: supabaseUrl })
