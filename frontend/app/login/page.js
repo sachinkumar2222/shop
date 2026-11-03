@@ -5,8 +5,8 @@ import { useAuth } from '../../context/AuthContext.js';
 import { ShoppingBag, Lock, Mail, ArrowRight, Sparkles } from 'lucide-react';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@shreepooja.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -54,7 +54,7 @@ export default function LoginPage() {
                 style={{ paddingLeft: '2.5rem' }}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@shreepooja.com"
+                placeholder="ravi@shreepooja.com"
                 required
               />
             </div>
@@ -87,11 +87,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Footer / Demo hint */}
-        <div style={styles.demoFooter}>
-          <Sparkles size={14} color="#eab308" />
-          <span>Demo Credentials: <code>admin@shreepooja.com</code> / <code>admin123</code></span>
-        </div>
       </div>
     </div>
   );
@@ -169,17 +164,5 @@ const styles = {
     width: '100%',
     padding: '0.85rem',
     marginTop: '0.5rem',
-  },
-  demoFooter: {
-    marginTop: '2rem',
-    paddingTop: '1.25rem',
-    borderTop: '1px solid #e5e7e2',
-    textAlign: 'center',
-    fontSize: '0.78rem',
-    color: '#64748b',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.4rem',
   },
 };

@@ -1,6 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import { NotFoundError, ConflictError, ValidationError } from '../utils/AppError.js';
 import { calcSellingPrice, formatStock, roundMoney } from '../utils/unit.utils.js';
+import {
+  encryptPii,
+  decryptProduct,
+  getBarcodeLookup,
+} from '../utils/customer-privacy.js';
 
 const prisma = new PrismaClient();
 
@@ -97,7 +102,7 @@ export const getAllProducts = async ({ forceRefresh = false } = {}) => {
     orderBy: { createdAt: 'desc' },
   });
 
-  const formatted = products.map(formatProductForResponse);
+  const formatted = products.map((p) => formatProductForResponse(decryptProduct(p)));
   productCache = formatted;
   cacheTimestamp = now;
 
@@ -123,13 +128,20 @@ export const getProductById = async (id) => {
   });
   if (!product) throw new NotFoundError('Product not found');
 
-  return formatProductForResponse(product);
+  return formatProductForResponse(decryptProduct(product));
 };
 
 export const getProductByBarcode = async (barcode) => {
-  // First search by Product barcode
-  let product = await prisma.product.findUnique({
-    where: { barcode },
+  const barcodeLookup = getBarcodeLookup(barcode);
+
+  // First search by Product barcode or barcodeLookup
+  let product = await prisma.product.findFirst({
+    where: {
+      OR: [
+        ...(barcodeLookup ? [{ barcodeLookup }] : []),
+        { barcode },
+      ],
+    },
     include: {
       category: true,
       units: { orderBy: { sortOrder: 'asc' } },
@@ -148,7 +160,12 @@ export const getProductByBarcode = async (barcode) => {
   // If not found on Product, search by ProductUnit barcode
   if (!product) {
     const unitMatch = await prisma.productUnit.findFirst({
-      where: { barcode },
+      where: {
+        OR: [
+          ...(barcodeLookup ? [{ barcodeLookup }] : []),
+          { barcode },
+        ],
+      },
       select: { productId: true },
     });
 
@@ -174,7 +191,7 @@ export const getProductByBarcode = async (barcode) => {
 
   if (!product) throw new NotFoundError('Product not found');
 
-  return formatProductForResponse(product);
+  return formatProductForResponse(decryptProduct(product));
 };
 
 export const getLowStockProducts = async () => {
@@ -203,17 +220,27 @@ export const createProduct = async (data) => {
   }
 
   if (barcode) {
-    const existing = await prisma.product.findUnique({ where: { barcode } });
+    const barcodeLookup = getBarcodeLookup(barcode);
+    const existing = await prisma.product.findFirst({
+      where: {
+        OR: [
+          ...(barcodeLookup ? [{ barcodeLookup }] : []),
+          { barcode },
+        ],
+      },
+    });
     if (existing) throw new ConflictError('Product with this barcode already exists');
   }
 
   return await prisma.$transaction(async (tx) => {
+    const barcodeLookup = barcode ? getBarcodeLookup(barcode) : null;
     const product = await tx.product.create({
       data: {
-        nameEn,
-        nameHi: nameHi || null,
+        nameEn: encryptPii(nameEn),
+        nameHi: nameHi ? encryptPii(nameHi) : null,
         categoryId,
-        barcode: barcode || null,
+        barcode: barcode ? encryptPii(barcode) : null,
+        barcodeLookup,
         baseUnit: baseUnit || 'piece',
         allowDecimalQty: Boolean(allowDecimalQty),
         lowStockThreshold: Number(lowStockThreshold || minAlertQty || 0),
@@ -244,11 +271,14 @@ export const createProduct = async (data) => {
         throw new ValidationError(`Unit factor for ${u.nameEn} must be greater than 0`);
       }
 
+      const unitBarcode = u.barcode || null;
+      const unitBarcodeLookup = unitBarcode ? getBarcodeLookup(unitBarcode) : null;
+
       await tx.productUnit.create({
         data: {
           productId: product.id,
           nameEn: u.nameEn,
-          nameHi: u.nameHi || null,
+          nameHi: u.nameHi ? encryptPii(u.nameHi) : null,
           factorToBase: factor,
           isPurchaseUnit: Boolean(u.isPurchaseUnit),
           isSellUnit: u.isSellUnit !== undefined ? Boolean(u.isSellUnit) : true,
@@ -256,7 +286,8 @@ export const createProduct = async (data) => {
           priceOverride: u.priceOverride ? Number(u.priceOverride) : null,
           minQty: Number(u.minQty || (allowDecimalQty ? 0.001 : 1.0)),
           qtyStep: Number(u.qtyStep || (allowDecimalQty ? 0.001 : 1.0)),
-          barcode: u.barcode || null,
+          barcode: unitBarcode ? encryptPii(unitBarcode) : null,
+          barcodeLookup: unitBarcodeLookup,
           sortOrder: parseInt(u.sortOrder || 0),
         },
       });
@@ -272,7 +303,7 @@ export const createProduct = async (data) => {
     });
 
     invalidateProductCache();
-    return formatProductForResponse(createdProduct);
+    return formatProductForResponse(decryptProduct(createdProduct));
   });
 };
 
@@ -283,17 +314,29 @@ export const updateProduct = async (id, data) => {
   });
   if (!product) throw new NotFoundError('Product not found');
 
-  if (data.barcode && data.barcode !== product.barcode) {
-    const existing = await prisma.product.findUnique({ where: { barcode: data.barcode } });
+  if (data.barcode) {
+    const barcodeLookup = getBarcodeLookup(data.barcode);
+    const existing = await prisma.product.findFirst({
+      where: {
+        OR: [
+          ...(barcodeLookup ? [{ barcodeLookup }] : []),
+          { barcode: data.barcode },
+        ],
+        NOT: { id },
+      },
+    });
     if (existing) throw new ConflictError('Product with this barcode already exists');
   }
 
   return await prisma.$transaction(async (tx) => {
     const updateData = {};
-    if (data.nameEn !== undefined) updateData.nameEn = data.nameEn;
-    if (data.nameHi !== undefined) updateData.nameHi = data.nameHi;
+    if (data.nameEn !== undefined) updateData.nameEn = encryptPii(data.nameEn);
+    if (data.nameHi !== undefined) updateData.nameHi = data.nameHi ? encryptPii(data.nameHi) : null;
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
-    if (data.barcode !== undefined) updateData.barcode = data.barcode || null;
+    if (data.barcode !== undefined) {
+      updateData.barcode = data.barcode ? encryptPii(data.barcode) : null;
+      updateData.barcodeLookup = data.barcode ? getBarcodeLookup(data.barcode) : null;
+    }
     if (data.baseUnit !== undefined) updateData.baseUnit = data.baseUnit;
     if (data.allowDecimalQty !== undefined) updateData.allowDecimalQty = Boolean(data.allowDecimalQty);
     if (data.lowStockThreshold !== undefined) updateData.lowStockThreshold = Number(data.lowStockThreshold);
@@ -312,12 +355,15 @@ export const updateProduct = async (id, data) => {
           throw new ValidationError(`Unit factor for ${u.nameEn} must be > 0`);
         }
 
+        const unitBarcode = u.barcode || null;
+        const unitBarcodeLookup = unitBarcode ? getBarcodeLookup(unitBarcode) : null;
+
         if (u.id) {
           await tx.productUnit.update({
             where: { id: u.id },
             data: {
               nameEn: u.nameEn,
-              nameHi: u.nameHi || null,
+              nameHi: u.nameHi ? encryptPii(u.nameHi) : null,
               factorToBase: factor,
               isPurchaseUnit: Boolean(u.isPurchaseUnit),
               isSellUnit: Boolean(u.isSellUnit),
@@ -325,7 +371,8 @@ export const updateProduct = async (id, data) => {
               priceOverride: u.priceOverride ? Number(u.priceOverride) : null,
               minQty: Number(u.minQty || 1),
               qtyStep: Number(u.qtyStep || 1),
-              barcode: u.barcode || null,
+              barcode: unitBarcode ? encryptPii(unitBarcode) : null,
+              barcodeLookup: unitBarcodeLookup,
               sortOrder: parseInt(u.sortOrder || 0),
             },
           });
@@ -334,7 +381,7 @@ export const updateProduct = async (id, data) => {
             data: {
               productId: id,
               nameEn: u.nameEn,
-              nameHi: u.nameHi || null,
+              nameHi: u.nameHi ? encryptPii(u.nameHi) : null,
               factorToBase: factor,
               isPurchaseUnit: Boolean(u.isPurchaseUnit),
               isSellUnit: Boolean(u.isSellUnit),
@@ -342,7 +389,8 @@ export const updateProduct = async (id, data) => {
               priceOverride: u.priceOverride ? Number(u.priceOverride) : null,
               minQty: Number(u.minQty || 1),
               qtyStep: Number(u.qtyStep || 1),
-              barcode: u.barcode || null,
+              barcode: unitBarcode ? encryptPii(unitBarcode) : null,
+              barcodeLookup: unitBarcodeLookup,
               sortOrder: parseInt(u.sortOrder || 0),
             },
           });
@@ -368,7 +416,7 @@ export const updateProduct = async (id, data) => {
     });
 
     invalidateProductCache();
-    return formatProductForResponse(updatedProduct);
+    return formatProductForResponse(decryptProduct(updatedProduct));
   });
 };
 

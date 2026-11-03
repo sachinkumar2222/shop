@@ -22,6 +22,7 @@ model Category {
 model Product {
   id                String         @id @default(uuid())
   barcode           String?        @unique
+  barcodeLookup     String?        @unique @map("barcode_lookup")
   nameEn            String         @map("name_en")
   nameHi            String?        @map("name_hi")
   imageUrl          String?        @map("image_url")
@@ -38,6 +39,7 @@ model Product {
   updatedAt         DateTime       @updatedAt @map("updated_at")
 
   @@index([barcode])
+  @@index([barcodeLookup])
   @@index([nameEn])
   @@index([nameHi])
   @@index([categoryId])
@@ -59,6 +61,7 @@ model ProductUnit {
   minQty          Decimal        @default(1) @db.Decimal(12, 3) @map("min_qty")
   qtyStep         Decimal        @default(1) @db.Decimal(12, 3) @map("qty_step")
   barcode         String?
+  barcodeLookup   String?        @map("barcode_lookup")
   sortOrder       Int            @default(0) @map("sort_order")
   purchaseBatches ProductBatch[]
   createdAt       DateTime       @default(now()) @map("created_at")
@@ -67,6 +70,7 @@ model ProductUnit {
   @@unique([productId, nameEn])
   @@index([productId])
   @@index([barcode])
+  @@index([barcodeLookup])
   @@map("product_units")
 }
 
@@ -210,14 +214,16 @@ model SalesInvoiceRefund {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      String   @default("CASHIER") // ADMIN, CASHIER
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid())
+  email       String   @unique
+  emailLookup String?  @unique @map("email_lookup")
+  name        String
+  password    String
+  role        String   @default("CASHIER") // ADMIN, CASHIER
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@index([emailLookup])
   @@map("users")
 }
 

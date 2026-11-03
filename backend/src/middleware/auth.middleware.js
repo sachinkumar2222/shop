@@ -1,6 +1,7 @@
 import { verifyToken } from '../utils/jwt.js';
 import { AuthenticationError, AuthorizationError } from '../utils/AppError.js';
 import { PrismaClient } from '@prisma/client';
+import { decryptUser } from '../utils/customer-privacy.js';
 
 const prisma = new PrismaClient();
 
@@ -33,7 +34,7 @@ export const authenticate = async (req, res, next) => {
       throw new AuthenticationError('User no longer exists');
     }
 
-    req.user = user;
+    req.user = decryptUser(user);
     next();
   } catch (error) {
     next(error);

@@ -1,32 +1,46 @@
 import { PrismaClient } from '@prisma/client';
 import { NotFoundError } from '../utils/AppError.js';
+import { encryptPii, decryptCategory } from '../utils/customer-privacy.js';
 
 const prisma = new PrismaClient();
 
 export const getAllCategories = async () => {
-  return await prisma.category.findMany({
-    orderBy: { nameEn: 'asc' },
-  });
+  const categories = await prisma.category.findMany();
+  return categories
+    .map(decryptCategory)
+    .sort((a, b) => (a.nameEn || '').localeCompare(b.nameEn || ''));
 };
 
 export const getCategoryById = async (id) => {
   const category = await prisma.category.findUnique({ where: { id } });
   if (!category) throw new NotFoundError('Category not found');
-  return category;
+  return decryptCategory(category);
 };
 
 export const createCategory = async (data) => {
-  return await prisma.category.create({ data });
+  const created = await prisma.category.create({
+    data: {
+      ...data,
+      nameEn: encryptPii(data.nameEn),
+      nameHi: encryptPii(data.nameHi),
+    },
+  });
+  return decryptCategory(created);
 };
 
 export const updateCategory = async (id, data) => {
   const category = await prisma.category.findUnique({ where: { id } });
   if (!category) throw new NotFoundError('Category not found');
 
-  return await prisma.category.update({
+  const updateData = { ...data };
+  if (data.nameEn !== undefined) updateData.nameEn = encryptPii(data.nameEn);
+  if (data.nameHi !== undefined) updateData.nameHi = encryptPii(data.nameHi);
+
+  const updated = await prisma.category.update({
     where: { id },
-    data,
+    data: updateData,
   });
+  return decryptCategory(updated);
 };
 
 export const deleteCategory = async (id) => {

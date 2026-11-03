@@ -2,12 +2,22 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { AuthenticationError } from '../utils/AppError.js';
 import { generateToken } from '../utils/jwt.js';
+import { getUserEmailLookup, decryptUser } from '../utils/customer-privacy.js';
 
 const prisma = new PrismaClient();
 
 export const loginUser = async (email, password) => {
-  const user = await prisma.user.findUnique({
-    where: { email },
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const emailLookup = getUserEmailLookup(normalizedEmail);
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { emailLookup },
+        { email: normalizedEmail },
+        { email },
+      ],
+    },
   });
 
   if (!user) {
@@ -20,13 +30,14 @@ export const loginUser = async (email, password) => {
   }
 
   const token = generateToken(user.id, user.role);
+  const decrypted = decryptUser(user);
 
   return {
     user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
+      id: decrypted.id,
+      email: decrypted.email,
+      name: decrypted.name,
+      role: decrypted.role,
     },
     token,
   };
@@ -37,5 +48,6 @@ export const getUserById = async (userId) => {
     where: { id: userId },
     select: { id: true, email: true, name: true, role: true, createdAt: true },
   });
-  return user;
+  return decryptUser(user);
 };
+

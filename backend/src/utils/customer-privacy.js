@@ -59,6 +59,74 @@ export const hashCheckoutRequest = (serializedRequest) => crypto
   .update(serializedRequest)
   .digest('hex');
 
+export const getUserEmailLookup = (email) => {
+  if (!email) return null;
+  return crypto
+    .createHmac('sha256', deriveKey('user-email-lookup'))
+    .update(String(email).trim().toLowerCase())
+    .digest('hex');
+};
+
+export const getBarcodeLookup = (barcode) => {
+  if (!barcode) return null;
+  return crypto
+    .createHmac('sha256', deriveKey('barcode-lookup'))
+    .update(String(barcode).trim())
+    .digest('hex');
+};
+
+export const decryptUser = (user) => {
+  if (!user) return user;
+  const { emailLookup, ...publicUser } = user;
+  return {
+    ...publicUser,
+    name: decryptPii(user.name),
+    email: decryptPii(user.email),
+  };
+};
+
+export const decryptCategory = (category) => {
+  if (!category) return category;
+  return {
+    ...category,
+    nameEn: decryptPii(category.nameEn),
+    nameHi: decryptPii(category.nameHi),
+  };
+};
+
+export const decryptProductUnit = (unit) => {
+  if (!unit) return unit;
+  const { barcodeLookup, ...rest } = unit;
+  return {
+    ...rest,
+    nameEn: decryptPii(unit.nameEn),
+    nameHi: decryptPii(unit.nameHi),
+    barcode: decryptPii(unit.barcode),
+  };
+};
+
+export const decryptProductBatch = (batch) => {
+  if (!batch) return batch;
+  return {
+    ...batch,
+    vendor: decryptPii(batch.vendor),
+  };
+};
+
+export const decryptProduct = (product) => {
+  if (!product) return product;
+  const { barcodeLookup, ...rest } = product;
+  return {
+    ...rest,
+    nameEn: decryptPii(product.nameEn),
+    nameHi: decryptPii(product.nameHi),
+    barcode: decryptPii(product.barcode),
+    ...(product.category ? { category: decryptCategory(product.category) } : {}),
+    ...(product.units ? { units: product.units.map(decryptProductUnit) } : {}),
+    ...(product.batches ? { batches: product.batches.map(decryptProductBatch) } : {}),
+  };
+};
+
 export const decryptCustomerPii = (customer) => {
   if (!customer) return customer;
   const { phoneLookup, ...publicCustomer } = customer;
@@ -79,3 +147,4 @@ export const decryptInvoicePii = (invoice) => {
     ...(invoice.customer ? { customer: decryptCustomerPii(invoice.customer) } : {}),
   };
 };
+

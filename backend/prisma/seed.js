@@ -1,22 +1,36 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import {
+  assertPiiEncryptionKey,
+  encryptPii,
+  getUserEmailLookup,
+} from '../src/utils/customer-privacy.js';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  assertPiiEncryptionKey();
+
   // 1. Seed Admin User
   console.log('Start seeding admin user...');
   const adminEmail = 'admin@shreepooja.com';
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email: adminEmail },
+  const adminEmailLookup = getUserEmailLookup(adminEmail);
+  const existingAdmin = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { emailLookup: adminEmailLookup },
+        { email: adminEmail },
+      ],
+    },
   });
 
   if (!existingAdmin) {
     const hashedPassword = await bcrypt.hash('admin123', 10);
     await prisma.user.create({
       data: {
-        name: 'Super Admin',
-        email: adminEmail,
+        name: encryptPii('Super Admin'),
+        email: encryptPii(adminEmail),
+        emailLookup: adminEmailLookup,
         password: hashedPassword,
         role: 'ADMIN',
       },
@@ -29,16 +43,23 @@ async function main() {
   // 2. Seed Cashier User
   console.log('Start seeding cashier user...');
   const cashierEmail = 'cashier@shreepooja.com';
-  const existingCashier = await prisma.user.findUnique({
-    where: { email: cashierEmail },
+  const cashierEmailLookup = getUserEmailLookup(cashierEmail);
+  const existingCashier = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { emailLookup: cashierEmailLookup },
+        { email: cashierEmail },
+      ],
+    },
   });
 
   if (!existingCashier) {
     const hashedPassword = await bcrypt.hash('cashier123', 10);
     await prisma.user.create({
       data: {
-        name: 'Store Cashier',
-        email: cashierEmail,
+        name: encryptPii('Store Cashier'),
+        email: encryptPii(cashierEmail),
+        emailLookup: cashierEmailLookup,
         password: hashedPassword,
         role: 'CASHIER',
       },

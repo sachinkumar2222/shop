@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS "categories" (
 CREATE TABLE IF NOT EXISTS "products" (
   "id"                  TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   "barcode"             TEXT UNIQUE,
+  "barcode_lookup"      TEXT UNIQUE,
   "name_en"             TEXT NOT NULL,
   "name_hi"             TEXT,
   "image_url"           TEXT,
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS "products" (
   "updated_at"          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_products_barcode ON "products"("barcode");
+CREATE INDEX IF NOT EXISTS idx_products_barcode_lookup ON "products"("barcode_lookup");
 CREATE INDEX IF NOT EXISTS idx_products_name_en ON "products"("name_en");
 CREATE INDEX IF NOT EXISTS idx_products_category ON "products"("category_id");
 
@@ -50,12 +52,14 @@ CREATE TABLE IF NOT EXISTS "product_units" (
   "min_qty"          DECIMAL(12,3) NOT NULL DEFAULT 1,
   "qty_step"         DECIMAL(12,3) NOT NULL DEFAULT 1,
   "barcode"          TEXT,
+  "barcode_lookup"   TEXT,
   "sort_order"       INTEGER NOT NULL DEFAULT 0,
   "created_at"       TIMESTAMPTZ NOT NULL DEFAULT now(),
   "updated_at"       TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE("product_id", "name_en")
 );
 CREATE INDEX IF NOT EXISTS idx_product_units_product ON "product_units"("product_id");
+CREATE INDEX IF NOT EXISTS idx_product_units_barcode_lookup ON "product_units"("barcode_lookup");
 
 -- Product Batches
 CREATE TABLE IF NOT EXISTS "product_batches" (
@@ -80,14 +84,16 @@ CREATE INDEX IF NOT EXISTS idx_batches_product ON "product_batches"("product_id"
 
 -- Users
 CREATE TABLE IF NOT EXISTS "users" (
-  "id"         TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  "email"      TEXT UNIQUE NOT NULL,
-  "name"       TEXT NOT NULL,
-  "password"   TEXT NOT NULL,
-  "role"       TEXT NOT NULL DEFAULT 'CASHIER',
-  "created_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
-  "updated_at" TIMESTAMPTZ NOT NULL DEFAULT now()
+  "id"           TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "email"        TEXT UNIQUE NOT NULL,
+  "email_lookup" TEXT UNIQUE,
+  "name"         TEXT NOT NULL,
+  "password"     TEXT NOT NULL,
+  "role"         TEXT NOT NULL DEFAULT 'CASHIER',
+  "created_at"   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "updated_at"   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS idx_users_email_lookup ON "users"("email_lookup");
 
 -- Customers
 CREATE TABLE IF NOT EXISTS "customers" (

@@ -1,11 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { ConflictError, NotFoundError, AppError } from '../utils/AppError.js';
+import { encryptPii, decryptUser, getUserEmailLookup } from '../utils/customer-privacy.js';
 
 const prisma = new PrismaClient();
 
 export const getAllUsers = async () => {
-  return await prisma.user.findMany({
+  const users = await prisma.user.findMany({
     select: {
       id: true,
       email: true,
@@ -15,10 +16,23 @@ export const getAllUsers = async () => {
     },
     orderBy: { createdAt: 'desc' },
   });
+  return users.map(decryptUser);
 };
 
 export const createUser = async ({ name, email, password, role }) => {
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const emailLookup = getUserEmailLookup(normalizedEmail);
+
+  const existing = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { emailLookup },
+        { email: normalizedEmail },
+        { email },
+      ],
+    },
+  });
+
   if (existing) {
     throw new ConflictError('A user with this email already exists');
   }
@@ -27,8 +41,9 @@ export const createUser = async ({ name, email, password, role }) => {
 
   const user = await prisma.user.create({
     data: {
-      name,
-      email,
+      name: encryptPii(name),
+      email: encryptPii(normalizedEmail),
+      emailLookup,
       password: hashedPassword,
       role,
     },
@@ -41,7 +56,7 @@ export const createUser = async ({ name, email, password, role }) => {
     },
   });
 
-  return user;
+  return decryptUser(user);
 };
 
 export const deleteUser = async (id, currentUserId) => {

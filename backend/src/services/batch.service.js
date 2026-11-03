@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { NotFoundError, ValidationError } from '../utils/AppError.js';
 import { calcSellingPrice, formatStock, roundMoney } from '../utils/unit.utils.js';
 import { invalidateProductCache } from './product.service.js';
+import { encryptPii, decryptProductBatch } from '../utils/customer-privacy.js';
 
 const prisma = new PrismaClient();
 
@@ -65,7 +66,7 @@ export const addBatch = async (data) => {
         sellingPrice: roundMoney(data.sellingPrice || rawPricePerUnit),
         initialStock: Math.round(qtyReceivedBase),
         currentStock: Math.round(qtyRemainingBase),
-        vendor: vendor || null,
+        vendor: vendor ? encryptPii(vendor) : null,
         receivedAt: new Date(),
       },
     });
@@ -137,10 +138,11 @@ export const getProductBatches = async (productId) => {
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) throw new NotFoundError('Product not found');
 
-  return await prisma.productBatch.findMany({
+  const batches = await prisma.productBatch.findMany({
     where: { productId },
     orderBy: { receivedAt: 'desc' },
   });
+  return batches.map(decryptProductBatch);
 };
 
 export const updateBatch = async (batchId, data) => {
@@ -180,7 +182,7 @@ export const updateBatch = async (batchId, data) => {
         qtyRemainingBase: newQtyRemainingBase,
         costPerBase: newCostPerBase,
         currentStock: Math.max(0, Math.floor(newQtyRemainingBase)),
-        vendor: data.vendor !== undefined ? data.vendor : batch.vendor,
+        vendor: data.vendor !== undefined ? (data.vendor ? encryptPii(data.vendor) : null) : batch.vendor,
       },
     });
 
@@ -202,7 +204,7 @@ export const updateBatch = async (batchId, data) => {
       }
     }
 
-    return updatedBatch;
+    return decryptProductBatch(updatedBatch);
   });
 };
 
