@@ -24,7 +24,7 @@ const client = new Client({
   authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
   puppeteer: {
     headless: true,
-    protocolTimeout: 120000,
+    protocolTimeout: 0,
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: [
       '--no-sandbox',
@@ -34,6 +34,10 @@ const client = new Client({
       '--no-first-run',
       '--no-zygote',
       '--disable-gpu',
+      '--disable-extensions',
+      '--disable-default-apps',
+      '--mute-audio',
+      '--js-flags=--max-old-space-size=256',
     ],
   },
 });
