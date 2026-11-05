@@ -23,6 +23,7 @@ const client = new Client({
   authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
   puppeteer: {
     headless: true,
+    protocolTimeout: 120000,
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: [
       '--no-sandbox',
@@ -83,7 +84,7 @@ export const requestPairingCode = async (phone) => {
   logger.info(`Requesting WhatsApp pairing code for phone: ${cleanPhone}`);
   const codePromise = client.requestPairingCode(cleanPhone);
   const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Pairing request timed out. Please wait a moment and try again.')), 30000)
+    setTimeout(() => reject(new Error('WhatsApp Web is still loading in the background. Please wait ~15 seconds and try again.')), 90000)
   );
 
   return await Promise.race([codePromise, timeoutPromise]);
