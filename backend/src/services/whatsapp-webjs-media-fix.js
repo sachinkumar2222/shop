@@ -26,3 +26,22 @@ try {
 } catch (error) {
   console.error('[WhatsApp] Could not apply media compatibility patch:', error.message);
 }
+
+// Patch Client.js for pairing code null-safety
+const clientJsPath = fileURLToPath(
+  new URL('../../node_modules/whatsapp-web.js/src/Client.js', import.meta.url)
+);
+
+try {
+  let clientSource = fs.readFileSync(clientJsPath, 'utf8');
+  if (clientSource.includes('while (!window.AuthStore.PairingCodeLinkUtils) {')) {
+    clientSource = clientSource.replace(
+      'while (!window.AuthStore.PairingCodeLinkUtils) {',
+      'while (!window.AuthStore || !window.AuthStore.PairingCodeLinkUtils) { if (!window.AuthStore) window.AuthStore = {}; try { if (window.require && !window.AuthStore.PairingCodeLinkUtils) window.AuthStore.PairingCodeLinkUtils = window.require("WAWebAltDeviceLinkingApi"); } catch(e){}'
+    );
+    fs.writeFileSync(clientJsPath, clientSource, 'utf8');
+    console.info('[WhatsApp] Applied PairingCodeLinkUtils null-safety patch.');
+  }
+} catch (error) {
+  console.error('[WhatsApp] Could not apply pairing code compatibility patch:', error.message);
+}

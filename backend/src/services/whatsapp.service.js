@@ -18,6 +18,7 @@ const { Client, LocalAuth, MessageMedia } = (await import('whatsapp-web.js')).de
 
 export let waStatus = 'INITIALIZING'; // INITIALIZING, QR_READY, CONNECTED, DISCONNECTED
 export let connectedPhone = null;
+export let waQrCode = null;
 
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
@@ -43,12 +44,14 @@ const readyWaiters = new Set();
 client.on('qr', async (qr) => {
   logger.info('WhatsApp Client is waiting for pairing...');
   waStatus = 'QR_READY';
+  waQrCode = qr;
 });
 
 client.on('ready', () => {
   logger.info('✅ WhatsApp Client is ready!');
   isClientReady = true;
   waStatus = 'CONNECTED';
+  waQrCode = null;
   connectedPhone = client.info?.wid?.user || null;
   for (const resolve of readyWaiters) resolve();
   readyWaiters.clear();
@@ -57,18 +60,21 @@ client.on('ready', () => {
 client.on('authenticated', () => {
   logger.info('WhatsApp Client authenticated successfully');
   waStatus = 'CONNECTED';
+  waQrCode = null;
 });
 
 client.on('auth_failure', (msg) => {
   logger.error({ msg }, 'WhatsApp authentication failed');
   isClientReady = false;
   waStatus = 'DISCONNECTED';
+  waQrCode = null;
 });
 
 client.on('disconnected', (reason) => {
   logger.warn({ reason }, 'WhatsApp client disconnected');
   isClientReady = false;
   waStatus = 'DISCONNECTED';
+  waQrCode = null;
   connectedPhone = null;
 });
 
@@ -91,7 +97,11 @@ export const requestPairingCode = async (phone) => {
 };
 
 export const getWhatsAppStatus = () => {
-  return { status: waStatus, connectedPhone: client?.info?.wid?.user || connectedPhone };
+  return { 
+    status: waStatus, 
+    connectedPhone: client?.info?.wid?.user || connectedPhone,
+    qr: waQrCode,
+  };
 };
 
 export const logoutWhatsApp = async () => {

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import QRCode from 'qrcode.react';
 
 export default function SettingsPage() {
   const [upiAccounts, setUpiAccounts] = useState([]);
@@ -13,6 +14,7 @@ export default function SettingsPage() {
   const [waPhone, setWaPhone] = useState('');
   const [waConnectedPhone, setWaConnectedPhone] = useState(null);
   const [waCode, setWaCode] = useState('');
+  const [waQr, setWaQr] = useState(null);
   const [waLoading, setWaLoading] = useState(false);
 
   // --- DB Sync state ---
@@ -49,6 +51,8 @@ export default function SettingsPage() {
       if (json.success) {
         setWaStatus(json.status);
         setWaConnectedPhone(json.connectedPhone);
+        if (json.qr) setWaQr(json.qr);
+        else if (json.status === 'CONNECTED') setWaQr(null);
       }
     } catch (err) {}
   };
@@ -401,25 +405,41 @@ export default function SettingsPage() {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleWaPair} className="settings-form" style={{ maxWidth: '600px' }}>
-            <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
-              <label>WhatsApp Number (with country code)</label>
-              <input 
-                type="text" 
-                className="input-control" 
-                placeholder="e.g. 919876543210" 
-                value={waPhone}
-                onChange={e => setWaPhone(e.target.value)}
-                disabled={waLoading || !!waCode}
-                required 
-              />
-            </div>
-            {!waCode && (
-              <button type="submit" className="btn btn-primary" style={{ height: '42px' }} disabled={waLoading}>
-                {waLoading ? 'Generating...' : 'Generate Pairing Code'}
-              </button>
+          <div>
+            {waQr && (
+              <div style={{ textAlign: 'center', marginBottom: '2rem', padding: '1.5rem', background: '#ffffff', borderRadius: '16px', border: '1px solid var(--border-color)', maxWidth: '340px' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#1e293b' }}>Scan QR to Connect Instantly</h4>
+                <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                  Open WhatsApp on your phone &gt; Linked Devices &gt; Link a Device &gt; Scan code:
+                </p>
+                <div style={{ display: 'inline-block', padding: '12px', background: '#fff', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
+                  <QRCode value={waQr} size={220} level="M" />
+                </div>
+                <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                  — OR ENTER PHONE NUMBER BELOW —
+                </div>
+              </div>
             )}
-          </form>
+            <form onSubmit={handleWaPair} className="settings-form" style={{ maxWidth: '600px' }}>
+              <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
+                <label>WhatsApp Number (with country code)</label>
+                <input 
+                  type="text" 
+                  className="input-control" 
+                  placeholder="e.g. 919876543210" 
+                  value={waPhone}
+                  onChange={e => setWaPhone(e.target.value)}
+                  disabled={waLoading || !!waCode}
+                  required 
+                />
+              </div>
+              {!waCode && (
+                <button type="submit" className="btn btn-primary" style={{ height: '42px' }} disabled={waLoading}>
+                  {waLoading ? 'Generating...' : 'Generate Pairing Code'}
+                </button>
+              )}
+            </form>
+          </div>
         )}
 
         {waCode && waStatus !== 'CONNECTED' && (
