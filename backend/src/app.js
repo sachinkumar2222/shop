@@ -40,6 +40,15 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Global rate limiter
 app.use('/api/', apiLimiter);
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Shree Pooja Ghar Backend API is running live',
+    health: '/api/v1/health',
+  });
+});
+
 // Routes
 app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/auth', authLimiter, authRoutes);
