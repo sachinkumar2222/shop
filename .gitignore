@@ -15,6 +15,8 @@ dist/
 **/.wwebjs_auth/
 .wwebjs_cache/
 **/.wwebjs_cache/
+.baileys_auth/
+**/.baileys_auth/
 
 # ─── Uploaded Media & Generated PDFs ───
 backend/uploads/*
