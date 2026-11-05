@@ -3,13 +3,14 @@ import rateLimit from 'express-rate-limit';
 // General API rate limiter
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
+  max: 5000,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path.includes('/whatsapp/status') || req.path.includes('/health'),
   message: {
     success: false,
     code: 'RATE_LIMITED',
-    message: 'Too many requests, please try again after 15 minutes.',
+    message: 'Too many requests, please try again later.',
   },
 });
 

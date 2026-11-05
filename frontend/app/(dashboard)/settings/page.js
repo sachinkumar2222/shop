@@ -40,9 +40,11 @@ export default function SettingsPage() {
   const fetchWaStatus = async () => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) return;
       const res = await fetch('/api/v1/whatsapp/status', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (res.status === 429) return;
       const json = await res.json();
       if (json.success) {
         setWaStatus(json.status);
@@ -54,7 +56,7 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchAccounts();
     fetchWaStatus();
-    const interval = setInterval(fetchWaStatus, 3000);
+    const interval = setInterval(fetchWaStatus, 10000);
 
     // Load saved Supabase credentials
     const token = localStorage.getItem('token');

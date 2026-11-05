@@ -73,9 +73,20 @@ client.on('disconnected', (reason) => {
 
 export const requestPairingCode = async (phone) => {
   if (isClientReady) throw new Error('WhatsApp is already connected');
-  logger.info(`Requesting WhatsApp pairing code for phone: ${phone}`);
-  const code = await client.requestPairingCode(phone);
-  return code;
+  if (!phone) throw new Error('Phone number is required');
+
+  const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+  if (!cleanPhone || cleanPhone.length < 10) {
+    throw new Error('Please enter a valid phone number with country code (e.g. 917877496745)');
+  }
+
+  logger.info(`Requesting WhatsApp pairing code for phone: ${cleanPhone}`);
+  const codePromise = client.requestPairingCode(cleanPhone);
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Pairing request timed out. Please wait a moment and try again.')), 30000)
+  );
+
+  return await Promise.race([codePromise, timeoutPromise]);
 };
 
 export const getWhatsAppStatus = () => {
