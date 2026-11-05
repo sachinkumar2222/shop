@@ -12,7 +12,7 @@ export default function SettingsPage() {
   const fetchAccounts = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/v1/upi', {
+      const res = await fetch('/api/v1/upi', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await res.json();
@@ -33,7 +33,7 @@ export default function SettingsPage() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/v1/upi', {
+      const res = await fetch('/api/v1/upi', {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -55,7 +55,7 @@ export default function SettingsPage() {
   const handleToggle = async (id, currentStatus) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3001/api/v1/upi/${id}/toggle`, {
+      const res = await fetch(`/api/v1/upi/${id}/toggle`, {
         method: 'PATCH',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -76,7 +76,7 @@ export default function SettingsPage() {
     if (!window.confirm('Are you sure you want to delete this UPI Account?')) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3001/api/v1/upi/${id}`, {
+      const res = await fetch(`/api/v1/upi/${id}`, {
         method: 'DELETE',
         headers: { 
           'Authorization': `Bearer ${token}`
