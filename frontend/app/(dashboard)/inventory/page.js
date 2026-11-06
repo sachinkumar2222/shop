@@ -355,16 +355,95 @@ export default function InventoryPage() {
         .inventory-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .inv-modal { width: 560px; max-width: 95vw; max-height: 90vh; overflow-y: auto; border-radius: 20px; padding: 1.75rem; background: #fff; color: #0f172a; }
+        .inv-product-modal {
+          width: 880px;
+          max-width: 96vw;
+          max-height: 90vh;
+          border-radius: 20px;
+          background: #ffffff;
+          color: #0f172a;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.35);
+          overflow: hidden;
+          border: 1px solid rgba(226, 232, 240, 0.9);
+        }
+        .inv-modal-header {
+          padding: 1.25rem 1.75rem;
+          border-bottom: 1px solid #e2e8f0;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: #fafaf9;
+          flex-shrink: 0;
+        }
+        .inv-modal-body {
+          padding: 1.5rem 1.75rem;
+          overflow-y: auto;
+          flex: 1;
+        }
+        .inv-modal-footer {
+          padding: 1rem 1.75rem;
+          border-top: 1px solid #e2e8f0;
+          display: flex;
+          justify-content: flex-end;
+          gap: 0.75rem;
+          background: #fafaf9;
+          flex-shrink: 0;
+        }
+        .unit-table-container {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          background: #ffffff;
+          margin-top: 0.6rem;
+        }
+        .unit-table {
+          width: 100%;
+          min-width: 760px;
+          border-collapse: collapse;
+          font-size: 0.83rem;
+        }
+        .unit-table th {
+          background: #f8fafc;
+          padding: 0.65rem 0.6rem;
+          font-weight: 700;
+          color: #475569;
+          font-size: 0.76rem;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .unit-table td {
+          padding: 0.55rem 0.5rem;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .unit-input {
+          padding: 6px 8px;
+          font-size: 0.82rem;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          outline: none;
+          background: #ffffff;
+          color: #0f172a;
+          width: 100%;
+          box-sizing: border-box;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .unit-input:focus {
+          border-color: #ea580c;
+          box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.15);
+        }
         .preset-btn { background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.78rem; cursor: pointer; font-weight: 600; }
         .preset-btn:hover { background: #ea580c; border-color: #ea580c; color: #fff; }
-        .unit-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.82rem; }
-        .unit-table th, .unit-table td { padding: 0.55rem 0.4rem; border-bottom: 1px solid #e2e8f0; text-align: left; color: #334155; }
-        .unit-table th { color: #475569; background: #f8fafc; }
         .batch-preview-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 1rem; margin: 1rem 0; }
         @media (max-width: 720px) {
           .inventory-header { flex-direction: column; align-items: flex-start; }
           .inventory-header .btn { width: 100%; }
-          .inv-modal { width: 100%; max-width: 100%; max-height: 100dvh; border-radius: 0; padding: 1rem; }
+          .inv-modal, .inv-product-modal { width: 100%; max-width: 100%; max-height: 100dvh; border-radius: 0; }
+          .inv-modal { padding: 1rem; }
+          .inv-modal-header, .inv-modal-body, .inv-modal-footer { padding: 1rem; }
         }
       `}</style>
 
@@ -476,265 +555,308 @@ export default function InventoryPage() {
           </table>
         </div>
 
-        {/* ─── Add Product Modal ─── */}
+        {/* ─── Add / Edit Product Modal ─── */}
         {showProductModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-            <div className="inv-modal glass-panel animate-fade-in">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>
-                  {editingProduct ? `Edit Product: ${editingProduct.nameEn}` : 'Add Multi-Unit Product'}
-                </h2>
-                <button onClick={() => { setShowProductModal(false); resetProductForm(); }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}><X size={20} /></button>
-              </div>
-
-              {error && <div style={{ background: '#fff1f2', color: '#be123c', border: '1px solid #fecdd3', padding: '0.6rem', borderRadius: 8, fontSize: '0.85rem', marginBottom: '1rem' }}>⚠️ {error}</div>}
-
-              {/* Quick Presets (only for new products) */}
-              {!editingProduct && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ fontSize: '0.8rem', color: '#475569', display: 'block', marginBottom: '0.4rem', fontWeight: 600 }}>Quick Product Presets:</label>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button type="button" className="preset-btn" onClick={() => applyPreset('kg_bori')}>🌾 kg + bori (50kg)</button>
-                    <button type="button" className="preset-btn" onClick={() => applyPreset('gram_bori')}>⚖️ gram + bori (25kg)</button>
-                    <button type="button" className="preset-btn" onClick={() => applyPreset('ml_tin')}>🛢️ ml + tin (15L)</button>
-                    <button type="button" className="preset-btn" onClick={() => applyPreset('piece_dozen')}>🔔 piece + dozen</button>
-                    <button type="button" className="preset-btn" onClick={() => applyPreset('bottle_carton')}>🍾 bottle + carton (24)</button>
-                    <button type="button" className="preset-btn" onClick={() => applyPreset('single_unit')}>📦 Single Unit Only</button>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(6px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+            <div className="inv-product-modal animate-fade-in">
+              <form onSubmit={handleSaveProduct} style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                <div className="inv-modal-header">
+                  <div>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      {editingProduct ? (
+                        <>
+                          <span style={{ background: '#e0f2fe', color: '#0284c7', padding: '3px 8px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700 }}>EDIT</span>
+                          <span>Edit Product: {editingProduct.nameEn}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span style={{ background: '#ffedd5', color: '#c2410c', padding: '3px 8px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700 }}>NEW</span>
+                          <span>Add Multi-Unit Product</span>
+                        </>
+                      )}
+                    </h2>
+                    <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                      {editingProduct ? 'Update product details, multi-units, margins, or photo' : 'Create base product and define buying/selling units'}
+                    </p>
                   </div>
-                </div>
-              )}
-
-              <form onSubmit={handleSaveProduct}>
-                <div className="form-grid">
-                  <div className="input-group">
-                    <label>English Name</label>
-                    <input type="text" className="input-control" placeholder="e.g. Sugar (Chini)" value={nameEn} onChange={(e) => setNameEn(e.target.value)} required />
-                  </div>
-                  <div className="input-group">
-                    <label>Hindi Name</label>
-                    <input type="text" className="input-control" placeholder="e.g. चीनी / शक्कर" value={nameHi} onChange={(e) => setNameHi(e.target.value)} required />
-                  </div>
+                  <button type="button" onClick={() => { setShowProductModal(false); resetProductForm(); }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}>
+                    <X size={22} />
+                  </button>
                 </div>
 
-                <div className="form-grid">
-                  <div className="input-group">
-                    <label>Category</label>
-                    <select className="input-control" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                      {categories.map((c) => (<option key={c.id} value={c.id}>{c.nameEn} ({c.nameHi})</option>))}
-                    </select>
-                  </div>
-                  <div className="input-group">
-                    <label>Barcode (Optional)</label>
-                    <input type="text" className="input-control" placeholder="e.g. 890100100101" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
-                  </div>
-                </div>
+                <div className="inv-modal-body">
+                  {error && <div style={{ background: '#fff1f2', color: '#be123c', border: '1px solid #fecdd3', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.88rem', marginBottom: '1.25rem' }}>⚠️ {error}</div>}
 
-                <div className="form-grid">
-                  <div className="input-group">
-                    <label>Base Unit (Smallest Unit)</label>
-                    <select
-                      className="input-control"
-                      value={baseUnit}
-                      onChange={(e) => {
-                        const newBase = e.target.value;
-                        setBaseUnit(newBase);
-                        // If single unit configured, sync unit name
-                        if (units.length === 1 && units[0].factorToBase === 1) {
-                          setUnits([{ ...units[0], nameEn: newBase, nameHi: newBase }]);
-                        }
-                      }}
-                    >
-                      <option value="piece">piece (पीस)</option>
-                      <option value="pack">pack (पैकेट)</option>
-                      <option value="gram">gram (ग्राम)</option>
-                      <option value="kg">kg (किलोग्राम)</option>
-                      <option value="ml">ml (मिलीलीटर)</option>
-                      <option value="litre">litre (लीटर)</option>
-                      <option value="bottle">bottle (बोतल)</option>
-                      <option value="set">set (सेट)</option>
-                      <option value="roll">roll (रोल)</option>
-                      <option value="pair">pair (जोड़ी)</option>
-                      <option value="meter">meter (मीटर)</option>
-                    </select>
-                  </div>
-                  <div className="input-group">
-                    <label>Low Stock Warning Threshold</label>
-                    <input type="number" step="0.1" className="input-control" value={lowStockThreshold} onChange={(e) => setLowStockThreshold(e.target.value)} />
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input type="checkbox" id="decimalQty" checked={allowDecimalQty} onChange={(e) => setAllowDecimalQty(e.target.checked)} />
-                  <label htmlFor="decimalQty" style={{ fontSize: '0.85rem', color: '#334155', cursor: 'pointer' }}>Allow decimal quantities at checkout (e.g. 0.5 kg / 500g)</label>
-                </div>
-
-                {/* Sell & Purchase Units Table */}
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: '0.75rem', marginBottom: '1rem', background: '#f8fafc' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#c2410c' }}>Product Units Configuration (Purchase & Sell Units)</label>
-                    <button type="button" onClick={addUnitRow} className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '2px 8px' }}>+ Add Unit</button>
-                  </div>
-
-                  <datalist id="custom-unit-suggestions">
-                    <option value="carton" />
-                    <option value="box" />
-                    <option value="tin" />
-                    <option value="dozen" />
-                    <option value="bori" />
-                    <option value="dabba" />
-                    <option value="bundle" />
-                    <option value="kg" />
-                    <option value="gram" />
-                    <option value="piece" />
-                    <option value="pack" />
-                    <option value="litre" />
-                  </datalist>
-
-                  <table className="unit-table">
-                    <thead>
-                      <tr>
-                        <th>Unit Name</th>
-                        <th>Hindi Name</th>
-                        <th>Factor to Base</th>
-                        <th>Margin %</th>
-                        <th>Override (₹)</th>
-                        <th>Min Qty</th>
-                        <th>Step</th>
-                        <th>Purchase</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {units.map((u, i) => (
-                        <tr key={i}>
-                          <td>
-                            <input
-                              type="text"
-                              list="custom-unit-suggestions"
-                              className="input-control"
-                              style={{ padding: '4px 6px', fontSize: '0.8rem' }}
-                              value={u.nameEn}
-                              onChange={(e) => updateUnitRow(i, 'nameEn', e.target.value)}
-                              required
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="text"
-                              className="input-control"
-                              style={{ padding: '4px 6px', fontSize: '0.8rem' }}
-                              value={u.nameHi || ''}
-                              onChange={(e) => updateUnitRow(i, 'nameHi', e.target.value)}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              step="0.0001"
-                              className="input-control"
-                              style={{ padding: '4px 6px', fontSize: '0.8rem', width: 65 }}
-                              value={u.factorToBase}
-                              onChange={(e) => updateUnitRow(i, 'factorToBase', e.target.value)}
-                              required
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              step="0.1"
-                              className="input-control"
-                              style={{ padding: '4px 6px', fontSize: '0.8rem', width: 55 }}
-                              value={u.marginPercent}
-                              onChange={(e) => updateUnitRow(i, 'marginPercent', e.target.value)}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              step="1"
-                              className="input-control"
-                              style={{ padding: '4px 6px', fontSize: '0.8rem', width: 60 }}
-                              placeholder="Auto"
-                              value={u.priceOverride || ''}
-                              onChange={(e) => updateUnitRow(i, 'priceOverride', e.target.value)}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              step="0.001"
-                              className="input-control"
-                              style={{ padding: '4px 6px', fontSize: '0.8rem', width: 55 }}
-                              value={u.minQty || 1}
-                              onChange={(e) => updateUnitRow(i, 'minQty', e.target.value)}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              step="0.001"
-                              className="input-control"
-                              style={{ padding: '4px 6px', fontSize: '0.8rem', width: 55 }}
-                              value={u.qtyStep || 1}
-                              onChange={(e) => updateUnitRow(i, 'qtyStep', e.target.value)}
-                            />
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <input
-                              type="radio"
-                              name="purchaseUnitRadio"
-                              checked={u.isPurchaseUnit}
-                              onChange={() => {
-                                const updated = units.map((row, idx) => ({ ...row, isPurchaseUnit: idx === i }));
-                                setUnits(updated);
-                              }}
-                            />
-                          </td>
-                          <td>
-                            {units.length > 1 && (
-                              <button type="button" onClick={() => removeUnitRow(i)} style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer' }}>✕</button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Product Image */}
-                <div className="input-group">
-                  <label>Product Image</label>
-                  <input type="file" accept="image/*" className="input-control" onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    setImageFile(f || null);
-                    setImagePreview(f ? URL.createObjectURL(f) : null);
-                  }} />
-                  {imagePreview && <img src={imagePreview} alt="preview" style={{ marginTop: '0.5rem', width: 60, height: 60, objectFit: 'cover', borderRadius: 8 }} />}
-                </div>
-
-                {!editingProduct && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.75rem 1rem', borderRadius: '8px', marginTop: '1rem' }}>
-                    <input 
-                      type="checkbox" 
-                      id="notifyWhatsAppBatch" 
-                      checked={notifyWhatsAppBatch} 
-                      onChange={(e) => setNotifyWhatsAppBatch(e.target.checked)}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#16a34a' }}
-                    />
-                    <div>
-                      <label htmlFor="notifyWhatsAppBatch" style={{ cursor: 'pointer', fontWeight: 600, color: '#166534', margin: 0, fontSize: '0.9rem', display: 'block' }}>
-                        📢 WhatsApp Broadcast: सभी ग्राहकों को नए स्टॉक की सूचना भेजें
-                      </label>
-                      <span style={{ color: '#15803d', fontSize: '0.78rem' }}>
-                        स्टॉक ऐड होते ही ग्राहकों के WhatsApp पर पर्सनलाइज्ड अपडेट जाएगा।
-                      </span>
+                  {/* Quick Presets (only for new products) */}
+                  {!editingProduct && (
+                    <div style={{ marginBottom: '1.25rem', background: '#fffaf5', border: '1px solid #ffedd5', padding: '0.85rem 1rem', borderRadius: 12 }}>
+                      <label style={{ fontSize: '0.82rem', color: '#9a3412', display: 'block', marginBottom: '0.4rem', fontWeight: 700 }}>Quick Product Presets:</label>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button type="button" className="preset-btn" onClick={() => applyPreset('kg_bori')}>🌾 kg + bori (50kg)</button>
+                        <button type="button" className="preset-btn" onClick={() => applyPreset('gram_bori')}>⚖️ gram + bori (25kg)</button>
+                        <button type="button" className="preset-btn" onClick={() => applyPreset('ml_tin')}>🛢️ ml + tin (15L)</button>
+                        <button type="button" className="preset-btn" onClick={() => applyPreset('piece_dozen')}>🔔 piece + dozen</button>
+                        <button type="button" className="preset-btn" onClick={() => applyPreset('bottle_carton')}>🍾 bottle + carton (24)</button>
+                        <button type="button" className="preset-btn" onClick={() => applyPreset('single_unit')}>📦 Single Unit Only</button>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button type="button" onClick={() => { setShowProductModal(false); resetProductForm(); }} className="btn btn-secondary">Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={loading}>
+                  {/* Product Basic Fields */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div className="form-grid">
+                      <div className="input-group">
+                        <label style={{ fontWeight: 600, fontSize: '0.86rem', color: '#334155', marginBottom: 4 }}>English Name *</label>
+                        <input type="text" className="input-control" placeholder="e.g. Pure Desi Ghee" value={nameEn} onChange={(e) => setNameEn(e.target.value)} required />
+                      </div>
+                      <div className="input-group">
+                        <label style={{ fontWeight: 600, fontSize: '0.86rem', color: '#334155', marginBottom: 4 }}>Hindi Name</label>
+                        <input type="text" className="input-control" placeholder="e.g. शुद्ध देसी घी" value={nameHi} onChange={(e) => setNameHi(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="input-group">
+                        <label style={{ fontWeight: 600, fontSize: '0.86rem', color: '#334155', marginBottom: 4 }}>Category *</label>
+                        <select className="input-control" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                          {categories.map((c) => (<option key={c.id} value={c.id}>{c.nameEn} ({c.nameHi})</option>))}
+                        </select>
+                      </div>
+                      <div className="input-group">
+                        <label style={{ fontWeight: 600, fontSize: '0.86rem', color: '#334155', marginBottom: 4 }}>Barcode (Optional)</label>
+                        <input type="text" className="input-control" placeholder="e.g. 890100100101" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="input-group">
+                        <label style={{ fontWeight: 600, fontSize: '0.86rem', color: '#334155', marginBottom: 4 }}>Base Unit (Smallest Unit) *</label>
+                        <select
+                          className="input-control"
+                          value={baseUnit}
+                          onChange={(e) => {
+                            const newBase = e.target.value;
+                            setBaseUnit(newBase);
+                            if (units.length === 1 && units[0].factorToBase === 1) {
+                              setUnits([{ ...units[0], nameEn: newBase, nameHi: newBase }]);
+                            }
+                          }}
+                        >
+                          <option value="piece">piece (पीस)</option>
+                          <option value="pack">pack (पैकेट)</option>
+                          <option value="gram">gram (ग्राम)</option>
+                          <option value="kg">kg (किलोग्राम)</option>
+                          <option value="ml">ml (मिलीलीटर)</option>
+                          <option value="litre">litre (लीटर)</option>
+                          <option value="bottle">bottle (बोतल)</option>
+                          <option value="set">set (सेट)</option>
+                          <option value="roll">roll (रोल)</option>
+                          <option value="pair">pair (जोड़ी)</option>
+                          <option value="meter">meter (मीटर)</option>
+                        </select>
+                      </div>
+                      <div className="input-group">
+                        <label style={{ fontWeight: 600, fontSize: '0.86rem', color: '#334155', marginBottom: 4 }}>Low Stock Warning Threshold</label>
+                        <input type="number" step="0.1" className="input-control" value={lowStockThreshold} onChange={(e) => setLowStockThreshold(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.2rem 0' }}>
+                      <input type="checkbox" id="decimalQty" checked={allowDecimalQty} onChange={(e) => setAllowDecimalQty(e.target.checked)} style={{ accentColor: '#ea580c', width: 16, height: 16 }} />
+                      <label htmlFor="decimalQty" style={{ fontSize: '0.85rem', color: '#334155', cursor: 'pointer', fontWeight: 500 }}>
+                        Allow decimal quantities at checkout (e.g. 0.5 kg / 500g)
+                      </label>
+                    </div>
+
+                    {/* Multi-Unit Configuration Table */}
+                    <div style={{ marginTop: '0.5rem', background: '#f8fafc', borderRadius: 14, padding: '1rem', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.9rem', fontWeight: 700, color: '#c2410c', display: 'block' }}>
+                            Product Units Configuration (Purchase & Sell Units)
+                          </label>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                            Define multiple packing sizes (e.g. gram, 500g, kg, bori) with conversion factors and margins.
+                          </span>
+                        </div>
+                        <button type="button" onClick={addUnitRow} className="btn btn-sm btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem' }}>
+                          <Plus size={14} /> Add Unit
+                        </button>
+                      </div>
+
+                      <div className="unit-table-container">
+                        <table className="unit-table">
+                          <thead>
+                            <tr>
+                              <th style={{ width: '130px' }}>Unit Name</th>
+                              <th style={{ width: '110px' }}>Hindi Name</th>
+                              <th style={{ width: '100px' }}>Factor to Base</th>
+                              <th style={{ width: '90px' }}>Margin %</th>
+                              <th style={{ width: '110px' }}>Override (₹)</th>
+                              <th style={{ width: '80px' }}>Min Qty</th>
+                              <th style={{ width: '80px' }}>Step</th>
+                              <th style={{ width: '80px', textAlign: 'center' }}>Purchase</th>
+                              <th style={{ width: '50px', textAlign: 'center' }}>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {units.map((u, i) => (
+                              <tr key={i}>
+                                <td>
+                                  <input
+                                    type="text"
+                                    list="custom-unit-suggestions"
+                                    className="unit-input"
+                                    placeholder="e.g. kg"
+                                    value={u.nameEn}
+                                    onChange={(e) => updateUnitRow(i, 'nameEn', e.target.value)}
+                                    required
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="text"
+                                    className="unit-input"
+                                    placeholder="e.g. किलो"
+                                    value={u.nameHi || ''}
+                                    onChange={(e) => updateUnitRow(i, 'nameHi', e.target.value)}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.0001"
+                                    className="unit-input"
+                                    value={u.factorToBase}
+                                    onChange={(e) => updateUnitRow(i, 'factorToBase', e.target.value)}
+                                    required
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    className="unit-input"
+                                    value={u.marginPercent}
+                                    onChange={(e) => updateUnitRow(i, 'marginPercent', e.target.value)}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="1"
+                                    className="unit-input"
+                                    placeholder="Auto"
+                                    value={u.priceOverride || ''}
+                                    onChange={(e) => updateUnitRow(i, 'priceOverride', e.target.value)}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.001"
+                                    className="unit-input"
+                                    value={u.minQty || 1}
+                                    onChange={(e) => updateUnitRow(i, 'minQty', e.target.value)}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.001"
+                                    className="unit-input"
+                                    value={u.qtyStep || 1}
+                                    onChange={(e) => updateUnitRow(i, 'qtyStep', e.target.value)}
+                                  />
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <input
+                                    type="radio"
+                                    name="purchaseUnitRadio"
+                                    checked={u.isPurchaseUnit}
+                                    onChange={() => {
+                                      const updated = units.map((row, idx) => ({ ...row, isPurchaseUnit: idx === i }));
+                                      setUnits(updated);
+                                    }}
+                                    style={{ accentColor: '#ea580c', cursor: 'pointer', width: 16, height: 16 }}
+                                  />
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  {units.length > 1 && (
+                                    <button type="button" onClick={() => removeUnitRow(i)} style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: 4 }} title="Remove unit">
+                                      <Trash2 size={16} />
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Product Image Card */}
+                    <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0' }}>
+                      <label style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.5rem' }}>
+                        Product Image (Stored Permanently on Cloudinary)
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+                        {imagePreview ? (
+                          <div style={{ position: 'relative', width: 72, height: 72, borderRadius: 10, overflow: 'hidden', border: '1px solid #cbd5e1', background: '#fff', flexShrink: 0 }}>
+                            <img src={imagePreview} alt="Product preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        ) : (
+                          <div style={{ width: 72, height: 72, borderRadius: 10, border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', fontSize: '1.8rem', flexShrink: 0 }}>
+                            🪔
+                          </div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 200 }}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="input-control"
+                            style={{ padding: '0.45rem', fontSize: '0.84rem' }}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              setImageFile(f || null);
+                              setImagePreview(f ? URL.createObjectURL(f) : (editingProduct?.imageUrl || null));
+                            }}
+                          />
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginTop: '0.3rem' }}>
+                            Upload a product photo. It will be stored permanently in Cloudinary and sent with WhatsApp broadcasts.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!editingProduct && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.75rem 1rem', borderRadius: 10 }}>
+                        <input 
+                          type="checkbox" 
+                          id="notifyWhatsAppBatch" 
+                          checked={notifyWhatsAppBatch} 
+                          onChange={(e) => setNotifyWhatsAppBatch(e.target.checked)}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#16a34a' }}
+                        />
+                        <div>
+                          <label htmlFor="notifyWhatsAppBatch" style={{ cursor: 'pointer', fontWeight: 600, color: '#166534', margin: 0, fontSize: '0.9rem', display: 'block' }}>
+                            📢 WhatsApp Broadcast: सभी ग्राहकों को नए स्टॉक की सूचना भेजें
+                          </label>
+                          <span style={{ color: '#15803d', fontSize: '0.78rem' }}>
+                            स्टॉक ऐड होते ही ग्राहकों के WhatsApp पर पर्सनलाइज्ड अपडेट जाएगा।
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="inv-modal-footer">
+                  <button type="button" onClick={() => { setShowProductModal(false); resetProductForm(); }} className="btn btn-secondary">
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1.4rem' }}>
+                    <Check size={16} />
                     {loading ? 'Saving...' : editingProduct ? 'Update Product' : 'Create Product'}
                   </button>
                 </div>
