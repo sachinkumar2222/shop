@@ -14,11 +14,30 @@ async function startServer() {
 
     app.listen(PORT, () => {
       logger.info(`Server is running on port ${PORT}`);
+      startKeepAlivePing();
     });
   } catch (error) {
     logger.error({ err: error }, 'Failed to start server');
     process.exit(1);
   }
+}
+
+function startKeepAlivePing() {
+  const pingUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || 'https://shop-tyl2.onrender.com';
+  if (!pingUrl) return;
+
+  const PING_INTERVAL = 10 * 60 * 1000; // Ping every 10 minutes to prevent Render 15-minute sleep
+  setInterval(async () => {
+    try {
+      const res = await fetch(`${pingUrl}/api/v1/health`);
+      if (res.ok) {
+        logger.info({ pingUrl }, 'Keep-alive self-ping successful');
+      }
+    } catch (err) {
+      logger.warn({ err: err.message }, 'Keep-alive ping failed');
+    }
+  }, PING_INTERVAL);
+  logger.info({ pingUrl }, 'Keep-alive pinger started (every 10 minutes)');
 }
 
 startServer();
