@@ -1,6 +1,6 @@
 import * as productService from '../services/product.service.js';
 import { PrismaClient } from '@prisma/client';
-import { uploadImageToCloudinary } from '../services/cloudinary.service.js';
+import { uploadImageToCloudinary, deleteImageFromCloudinary } from '../services/cloudinary.service.js';
 
 const prisma = new PrismaClient();
 
@@ -64,7 +64,13 @@ export const uploadProductImage = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'No image file uploaded' });
     }
 
-    // Attempt upload to Cloudinary (returns secure HTTPS URL)
+    // 1. Fetch current product to find any existing image to clean up
+    const existingProduct = await prisma.product.findUnique({
+      where: { id: req.params.id },
+      select: { imageUrl: true },
+    });
+
+    // 2. Attempt upload to Cloudinary (returns secure HTTPS URL)
     let imageUrl = null;
     try {
       const cloudinaryUrl = await uploadImageToCloudinary(req.file.path, 'shreepooja/products');
@@ -80,10 +86,19 @@ export const uploadProductImage = async (req, res, next) => {
       imageUrl = `/uploads/products/${req.file.filename}`;
     }
 
+    // 3. Update product with new image URL
     const product = await prisma.product.update({
       where: { id: req.params.id },
       data: { imageUrl },
     });
+
+    // 4. Delete old image from Cloudinary (or disk) so storage remains clean
+    if (existingProduct?.imageUrl && existingProduct.imageUrl !== imageUrl) {
+      deleteImageFromCloudinary(existingProduct.imageUrl).catch((delErr) => {
+        console.warn('Failed to delete old image after replacement:', delErr.message);
+      });
+    }
+
     res.json({ success: true, message: 'Image uploaded successfully', data: { imageUrl, product } });
   } catch (error) {
     next(error);

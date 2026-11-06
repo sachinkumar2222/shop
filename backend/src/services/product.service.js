@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { NotFoundError, ConflictError, ValidationError } from '../utils/AppError.js';
 import { calcSellingPrice, formatStock, roundMoney } from '../utils/unit.utils.js';
+import { deleteImageFromCloudinary } from './cloudinary.service.js';
 import {
   encryptPii,
   decryptProduct,
@@ -341,6 +342,14 @@ export const updateProduct = async (id, data) => {
     if (data.allowDecimalQty !== undefined) updateData.allowDecimalQty = Boolean(data.allowDecimalQty);
     if (data.lowStockThreshold !== undefined) updateData.lowStockThreshold = Number(data.lowStockThreshold);
     if (data.minAlertQty !== undefined) updateData.minAlertQty = parseInt(data.minAlertQty);
+    if (data.imageUrl !== undefined) {
+      updateData.imageUrl = data.imageUrl;
+      if (product.imageUrl && product.imageUrl !== data.imageUrl) {
+        deleteImageFromCloudinary(product.imageUrl).catch((err) => {
+          console.warn('Failed to delete old image on product update:', err.message);
+        });
+      }
+    }
 
     await tx.product.update({
       where: { id },
@@ -423,6 +432,13 @@ export const updateProduct = async (id, data) => {
 export const deleteProduct = async (id) => {
   const product = await prisma.product.findUnique({ where: { id } });
   if (!product) throw new NotFoundError('Product not found');
+
+  // If product has an image, delete it from Cloudinary / disk
+  if (product.imageUrl) {
+    deleteImageFromCloudinary(product.imageUrl).catch((delErr) => {
+      console.warn('Failed to delete image on product deletion:', delErr.message);
+    });
+  }
 
   await prisma.productBatch.deleteMany({ where: { productId: id } });
   await prisma.productUnit.deleteMany({ where: { productId: id } });
