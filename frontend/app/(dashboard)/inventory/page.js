@@ -55,6 +55,7 @@ export default function InventoryPage() {
   const [purchasePricePerUnit, setPurchasePricePerUnit] = useState(''); // "Bori ka rate"
   const [vendor, setVendor] = useState('');
   const [batchMarginOverrides, setBatchMarginOverrides] = useState({});
+  const [notifyWhatsAppBatch, setNotifyWhatsAppBatch] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -197,6 +198,17 @@ export default function InventoryPage() {
         });
       }
 
+      if (notifyWhatsAppBatch && product?.id) {
+        try {
+          await apiFetch('/whatsapp/broadcast', {
+            method: 'POST',
+            body: JSON.stringify({ productId: product.id, type: 'NEW_PRODUCT' }),
+          });
+        } catch (bErr) {
+          console.warn('Failed to queue WhatsApp broadcast:', bErr);
+        }
+      }
+
       setShowProductModal(false);
       resetProductForm();
       fetchProducts();
@@ -223,6 +235,7 @@ export default function InventoryPage() {
           purchaseQty: parseFloat(purchaseQty),
           purchasePricePerUnit: parseFloat(purchasePricePerUnit),
           vendor: vendor.trim() || undefined,
+          notifyWhatsApp: notifyWhatsAppBatch,
         }),
       });
 
@@ -634,6 +647,24 @@ export default function InventoryPage() {
                   {imagePreview && <img src={imagePreview} alt="preview" style={{ marginTop: '0.5rem', width: 60, height: 60, objectFit: 'cover', borderRadius: 8 }} />}
                 </div>
 
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.75rem 1rem', borderRadius: '8px', marginTop: '1rem' }}>
+                  <input 
+                    type="checkbox" 
+                    id="notifyWhatsAppBatch" 
+                    checked={notifyWhatsAppBatch} 
+                    onChange={(e) => setNotifyWhatsAppBatch(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#16a34a' }}
+                  />
+                  <div>
+                    <label htmlFor="notifyWhatsAppBatch" style={{ cursor: 'pointer', fontWeight: 600, color: '#166534', margin: 0, fontSize: '0.9rem', display: 'block' }}>
+                      📢 WhatsApp Broadcast: सभी ग्राहकों को नए स्टॉक की सूचना भेजें
+                    </label>
+                    <span style={{ color: '#15803d', fontSize: '0.78rem' }}>
+                      स्टॉक ऐड होते ही ग्राहकों के WhatsApp पर पर्सनलाइज्ड अपडेट जाएगा।
+                    </span>
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                   <button type="button" onClick={() => setShowProductModal(false)} className="btn btn-secondary">Cancel</button>
                   <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Saving...' : 'Create Product'}</button>
@@ -731,6 +762,24 @@ export default function InventoryPage() {
                     </table>
                   </div>
                 )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.75rem 1rem', borderRadius: '8px', marginTop: '1rem' }}>
+                  <input 
+                    type="checkbox" 
+                    id="notifyWhatsAppBatch" 
+                    checked={notifyWhatsAppBatch} 
+                    onChange={(e) => setNotifyWhatsAppBatch(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#16a34a' }}
+                  />
+                  <div>
+                    <label htmlFor="notifyWhatsAppBatch" style={{ cursor: 'pointer', fontWeight: 600, color: '#166534', margin: 0, fontSize: '0.9rem', display: 'block' }}>
+                      📢 WhatsApp Broadcast: सभी ग्राहकों को नए स्टॉक की सूचना भेजें
+                    </label>
+                    <span style={{ color: '#15803d', fontSize: '0.78rem' }}>
+                      स्टॉक ऐड होते ही ग्राहकों के WhatsApp पर पर्सनलाइज्ड अपडेट जाएगा।
+                    </span>
+                  </div>
+                </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                   <button type="button" onClick={() => setShowBatchModal(false)} className="btn btn-secondary">Cancel</button>

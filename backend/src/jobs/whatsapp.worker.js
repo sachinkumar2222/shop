@@ -1,17 +1,26 @@
 import { Worker } from 'bullmq';
 import { redisConnection } from '../config/redis.js';
 import { logger } from '../config/logger.js';
-import { sendWhatsAppInvoice } from '../services/whatsapp.service.js';
+import { sendWhatsAppInvoice, broadcastProductArrival } from '../services/whatsapp.service.js';
 import { getInvoiceById, markWaSent, markWaFailed } from '../services/invoice.service.js';
 
 /**
  * WhatsApp Worker
  * Processes jobs from the whatsappQueue.
- * Completely isolated from checkout — invoice is already saved when this runs.
+ * Handles both invoice dispatches and product arrival broadcasts.
  */
 export const whatsappWorker = new Worker(
   'whatsappQueue',
   async (job) => {
+    // 1. Handle Product Arrival Broadcast
+    if (job.name === 'product-broadcast' || job.data?.broadcastType === 'PRODUCT_ARRIVAL' || job.data?.type === 'NEW_PRODUCT' || job.data?.type === 'NEW_BATCH') {
+      const { productId, type } = job.data;
+      logger.info({ jobId: job.id, productId, type }, 'Processing WhatsApp product broadcast job');
+      await broadcastProductArrival({ productId, type });
+      return;
+    }
+
+    // 2. Handle Invoice Dispatch
     const { invoiceId } = job.data;
     logger.info({ jobId: job.id, invoiceId }, 'Processing WhatsApp invoice job');
 

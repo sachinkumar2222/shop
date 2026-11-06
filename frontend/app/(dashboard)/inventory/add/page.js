@@ -19,6 +19,7 @@ export default function AddProductPage() {
   const [lowStockThreshold, setLowStockThreshold] = useState(10);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [notifyWhatsApp, setNotifyWhatsApp] = useState(true);
 
   // Multi-unit definitions
   const [units, setUnits] = useState([
@@ -123,6 +124,17 @@ export default function AddProductPage() {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
           body: formData,
         });
+      }
+
+      if (notifyWhatsApp && product?.id) {
+        try {
+          await apiFetch('/whatsapp/broadcast', {
+            method: 'POST',
+            body: JSON.stringify({ productId: product.id, type: 'NEW_PRODUCT' }),
+          });
+        } catch (bErr) {
+          console.warn('Failed to queue WhatsApp broadcast:', bErr);
+        }
       }
 
       router.push('/inventory');
@@ -565,6 +577,25 @@ export default function AddProductPage() {
                   )}
                 </article>
               ))}
+            </div>
+          </div>
+
+          {/* WhatsApp Notification Card */}
+          <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1.1rem' }}>
+            <input 
+              type="checkbox" 
+              id="notifyWhatsApp" 
+              checked={notifyWhatsApp} 
+              onChange={(e) => setNotifyWhatsApp(e.target.checked)}
+              style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#16a34a' }}
+            />
+            <div>
+              <label htmlFor="notifyWhatsApp" style={{ cursor: 'pointer', fontWeight: 700, color: '#166534', margin: 0, fontSize: '0.98rem', display: 'block' }}>
+                📢 WhatsApp Broadcast: सभी ग्राहकों को नए सामान की सूचना भेजें (फोटो सहित)
+              </label>
+              <span style={{ color: '#15803d', fontSize: '0.82rem' }}>
+                नया प्रोडक्ट बनते ही सभी रजिस्टर्ड ग्राहकों के WhatsApp पर पर्सनलाइज्ड मैसेज भेजा जाएगा।
+              </span>
             </div>
           </div>
 

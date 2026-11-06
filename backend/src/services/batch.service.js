@@ -3,6 +3,7 @@ import { NotFoundError, ValidationError } from '../utils/AppError.js';
 import { calcSellingPrice, formatStock, roundMoney } from '../utils/unit.utils.js';
 import { invalidateProductCache } from './product.service.js';
 import { encryptPii, decryptProductBatch } from '../utils/customer-privacy.js';
+import { whatsappQueue } from '../jobs/whatsapp.queue.js';
 
 const prisma = new PrismaClient();
 
@@ -131,6 +132,19 @@ export const addBatch = async (data) => {
   });
 
   invalidateProductCache();
+
+  if (data.notifyWhatsApp) {
+    try {
+      await whatsappQueue.add('product-broadcast', {
+        productId,
+        type: 'NEW_BATCH',
+        broadcastType: 'PRODUCT_ARRIVAL',
+      });
+    } catch (e) {
+      // Ignore broadcast queue errors so batch creation is never interrupted
+    }
+  }
+
   return result;
 };
 

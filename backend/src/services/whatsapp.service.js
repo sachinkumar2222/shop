@@ -4,10 +4,14 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
+import { PrismaClient } from '@prisma/client';
 import { logger } from '../config/logger.js';
 import { generateReceiptPDF } from './receipt.service.js';
+import { decryptProduct, decryptCustomerPii } from '../utils/customer-privacy.js';
 import fs from 'fs';
 import path from 'path';
+
+const prisma = new PrismaClient();
 
 /**
  * Lightweight WhatsApp Service powered by @whiskeysockets/baileys
@@ -221,4 +225,136 @@ export const sendWhatsAppInvoice = async (invoice) => {
   });
 
   logger.info({ invoiceNo: invoice.invoiceNo, recipientJid }, '✅ WhatsApp invoice PDF sent successfully');
+};
+
+// ─── Product Arrival Broadcast ───────────────────────────────────────────────
+
+const buildProductBroadcastCaption = ({ customerName, product, type = 'NEW_PRODUCT' }) => {
+  const storeName = process.env.STORE_NAME || 'श्री पूजा घर (Shree Pooja Ghar)';
+  const storeAddress = process.env.STORE_ADDRESS || 'अजमेर, राजस्थान';
+  const storePhone = process.env.STORE_PHONE || '917877496745';
+
+  const nameHi = product.nameHi ? product.nameHi.trim() : '';
+  const nameEn = product.nameEn ? product.nameEn.trim() : '';
+  const displayName = nameHi && nameEn && nameHi !== nameEn 
+    ? `${nameHi} (${nameEn})` 
+    : (nameHi || nameEn);
+
+  const headline = type === 'NEW_BATCH' 
+    ? '✨ *नया स्टॉक आ चुका है!*' 
+    : '✨ *नया सामान दुकान पर उपलब्ध है!*';
+
+  const customerGreeting = customerName && customerName.trim() && customerName !== 'Guest Customer'
+    ? `नमस्ते *${customerName.trim()}* जी! 🙏`
+    : 'नमस्ते! 🙏';
+
+  const lines = [
+    `🌸 *${storeName}* 🌸`,
+    '',
+    customerGreeting,
+    '',
+    headline,
+    `📦 *${displayName}*`,
+    '',
+    '✅ शुद्ध एवं प्रामाणिक पूजा सामग्री अब उपलब्ध है। आज ही दुकान पर पधारें या संपर्क करें!',
+    '',
+    `📍 *पता:* ${storeAddress}`,
+    `📞 *संपर्क / WhatsApp:* ${storePhone}`,
+  ];
+
+  return lines.join('\n');
+};
+
+export const broadcastProductArrival = async ({ productId, type = 'NEW_PRODUCT' }) => {
+  const mockMode = process.env.NODE_ENV === 'test' || process.env.WHATSAPP_PROVIDER === 'mock';
+  if (!mockMode) await waitForWhatsAppClientReady();
+
+  // 1. Fetch product
+  const rawProduct = await prisma.product.findUnique({
+    where: { id: productId },
+    include: { units: true, category: true },
+  });
+  if (!rawProduct) {
+    logger.warn({ productId }, 'Product not found for WhatsApp broadcast');
+    return;
+  }
+  const product = decryptProduct(rawProduct);
+
+  // 2. Fetch all registered customers
+  const rawCustomers = await prisma.customer.findMany({
+    select: { id: true, name: true, phone: true, firstName: true },
+  });
+
+  const customers = rawCustomers
+    .map((c) => decryptCustomerPii(c))
+    .filter((c) => c && c.phone && String(c.phone).replace(/\D/g, '').length >= 10);
+
+  logger.info(
+    { productId, product: product.nameEn, totalCustomers: customers.length },
+    'Starting product arrival WhatsApp broadcast'
+  );
+
+  if (customers.length === 0) {
+    logger.info('No customers found with valid phone numbers for broadcast');
+    return;
+  }
+
+  // 3. Check for product image
+  let imageBuffer = null;
+  if (product.imageUrl) {
+    const cleanPath = product.imageUrl.replace(/^\//, '');
+    const fullPath = path.resolve(process.cwd(), cleanPath);
+    if (fs.existsSync(fullPath)) {
+      try {
+        imageBuffer = fs.readFileSync(fullPath);
+      } catch (err) {
+        logger.warn({ err: err.message, fullPath }, 'Could not read product image file for broadcast');
+      }
+    }
+  }
+
+  // 4. Send to each customer with 4-second delay
+  let sentCount = 0;
+  let failCount = 0;
+
+  for (const customer of customers) {
+    try {
+      const recipientJid = getWhatsAppRecipientJid(customer.phone);
+      const customerName = customer.name || customer.firstName || 'Customer';
+      const caption = buildProductBroadcastCaption({ customerName, product, type });
+
+      if (mockMode) {
+        logger.info({ customerName, phone: customer.phone }, '[MOCK] Broadcast simulated');
+      } else {
+        if (imageBuffer) {
+          await sock.sendMessage(recipientJid, {
+            image: imageBuffer,
+            caption,
+          });
+        } else {
+          await sock.sendMessage(recipientJid, {
+            text: caption,
+          });
+        }
+      }
+
+      sentCount++;
+      logger.info(
+        { customerName, phone: customer.phone, sentCount, total: customers.length },
+        'WhatsApp broadcast sent to customer'
+      );
+
+      // Safe pacing: 4 seconds between messages to protect WhatsApp number
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+    } catch (err) {
+      failCount++;
+      logger.error({ err: err.message, customerId: customer.id }, 'Failed to send broadcast to customer');
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+
+  logger.info(
+    { productId, sentCount, failCount, total: customers.length },
+    'WhatsApp product broadcast completed'
+  );
 };
