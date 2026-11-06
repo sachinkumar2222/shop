@@ -1,5 +1,6 @@
 import * as productService from '../services/product.service.js';
 import { PrismaClient } from '@prisma/client';
+import { uploadImageToCloudinary } from '../services/cloudinary.service.js';
 
 const prisma = new PrismaClient();
 
@@ -62,12 +63,28 @@ export const uploadProductImage = async (req, res, next) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No image file uploaded' });
     }
-    const imageUrl = `/uploads/products/${req.file.filename}`;
+
+    // Attempt upload to Cloudinary (returns secure HTTPS URL)
+    let imageUrl = null;
+    try {
+      const cloudinaryUrl = await uploadImageToCloudinary(req.file.path, 'shreepooja/products');
+      if (cloudinaryUrl) {
+        imageUrl = cloudinaryUrl;
+      }
+    } catch (uploadErr) {
+      // If Cloudinary fails, fallback to local path
+      console.error('Cloudinary upload failed, falling back to local storage:', uploadErr.message);
+    }
+
+    if (!imageUrl) {
+      imageUrl = `/uploads/products/${req.file.filename}`;
+    }
+
     const product = await prisma.product.update({
       where: { id: req.params.id },
       data: { imageUrl },
     });
-    res.json({ success: true, message: 'Image uploaded', data: { imageUrl, product } });
+    res.json({ success: true, message: 'Image uploaded successfully', data: { imageUrl, product } });
   } catch (error) {
     next(error);
   }

@@ -299,16 +299,30 @@ export const broadcastProductArrival = async ({ productId, type = 'NEW_PRODUCT' 
     return;
   }
 
-  // 3. Check for product image
+  // 3. Check for product image (supports Cloudinary HTTPS URL or local file)
   let imageBuffer = null;
   if (product.imageUrl) {
-    const cleanPath = product.imageUrl.replace(/^\//, '');
-    const fullPath = path.resolve(process.cwd(), cleanPath);
-    if (fs.existsSync(fullPath)) {
+    if (product.imageUrl.startsWith('http://') || product.imageUrl.startsWith('https://')) {
       try {
-        imageBuffer = fs.readFileSync(fullPath);
+        const resp = await fetch(product.imageUrl);
+        if (resp.ok) {
+          const arrayBuffer = await resp.arrayBuffer();
+          imageBuffer = Buffer.from(arrayBuffer);
+        } else {
+          logger.warn({ status: resp.status, url: product.imageUrl }, 'Failed to download product image from remote URL');
+        }
       } catch (err) {
-        logger.warn({ err: err.message, fullPath }, 'Could not read product image file for broadcast');
+        logger.warn({ err: err.message, url: product.imageUrl }, 'Could not fetch remote product image for broadcast');
+      }
+    } else {
+      const cleanPath = product.imageUrl.replace(/^\//, '');
+      const fullPath = path.resolve(process.cwd(), cleanPath);
+      if (fs.existsSync(fullPath)) {
+        try {
+          imageBuffer = fs.readFileSync(fullPath);
+        } catch (err) {
+          logger.warn({ err: err.message, fullPath }, 'Could not read product image file for broadcast');
+        }
       }
     }
   }

@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import PDFDocument from 'pdfkit';
 import { logger } from '../config/logger.js';
 import fs from 'fs';
 import path from 'path';
@@ -14,15 +14,19 @@ const escapeHtml = (value = '') => String(value)
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
 
-const formatMoney = (value) => `₹${Number(value || 0).toFixed(2)}`;
+const formatMoney = (value) => `Rs ${Number(value || 0).toFixed(2)}`;
+
 const getItemGrossTotal = (item) => {
   const grossLineTotal = Number(item.grossLineTotal);
   if (item.grossLineTotal !== undefined && item.grossLineTotal !== null && Number.isFinite(grossLineTotal)) {
     return grossLineTotal;
   }
   const lineTotal = Number(item.lineTotal);
-  return Number.isFinite(lineTotal) ? lineTotal : Number(item.unitPrice ?? item.unitSalePrice ?? 0) * Number(item.qtyInUnit ?? item.quantity ?? 1);
+  return Number.isFinite(lineTotal)
+    ? lineTotal
+    : Number(item.unitPrice ?? item.unitSalePrice ?? 0) * Number(item.qtyInUnit ?? item.quantity ?? 1);
 };
+
 const getInvoiceSubtotal = (invoice, items) => {
   const subtotal = Number(invoice.subtotal);
   return invoice.subtotal !== undefined && invoice.subtotal !== null && Number.isFinite(subtotal)
@@ -30,175 +34,136 @@ const getInvoiceSubtotal = (invoice, items) => {
     : items.reduce((sum, item) => sum + getItemGrossTotal(item), 0);
 };
 
+/**
+ * Generate lightweight A4 PDF Receipt using PDFKit (No Chromium / Puppeteer — uses ~5MB RAM)
+ */
 export const generateReceiptPDF = async (invoice) => {
-  const createdAt = new Date(invoice.createdAt || Date.now());
-  const date = Number.isNaN(createdAt.getTime()) ? new Date() : createdAt;
-  const dateLabel = date.toLocaleDateString('en-IN', {
-    timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric',
-  });
-  const timeLabel = date.toLocaleTimeString('en-IN', {
-    timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit',
-  });
-  const items = Array.isArray(invoice.items) ? invoice.items : [];
-  const subtotal = getInvoiceSubtotal(invoice, items);
-  const discountAmount = Number(invoice.discountAmount || 0);
-  const total = Number(invoice.totalAmount || 0);
-  const paymentLabels = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card', KHATA: 'Khata' };
-  const paymentMode = paymentLabels[String(invoice.paymentMode || '').toUpperCase()] || 'Other';
-  const storeName = escapeHtml(process.env.STORE_NAME || 'Shree Pooja Ghar');
-  const storeAddress = escapeHtml(process.env.STORE_ADDRESS || 'Ajmer, Rajasthan, India');
-  const storePhone = process.env.STORE_PHONE ? escapeHtml(process.env.STORE_PHONE) : '';
-  const customerName = escapeHtml(invoice.customerName || 'Guest Customer');
-  const customerPhone = escapeHtml(invoice.customerPhone || 'Not provided');
-  const invoiceNo = escapeHtml(invoice.invoiceNo || 'N/A');
-  const logoPath = path.resolve(__dirname, '../../assets/store-logo.png');
-  const logo = fs.existsSync(logoPath)
-    ? `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`
-    : '';
+  return new Promise((resolve, reject) => {
+    try {
+      const createdAt = new Date(invoice.createdAt || Date.now());
+      const date = Number.isNaN(createdAt.getTime()) ? new Date() : createdAt;
+      const dateLabel = date.toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric',
+      });
+      const timeLabel = date.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit',
+      });
 
-  const itemRows = items.map((item) => {
-    const qty = Number(item.qtyInUnit ?? item.quantity ?? 1);
-    const unitName = item.unitName ? ` ${escapeHtml(item.unitName)}` : '';
-    const unitPrice = Number(item.unitPrice ?? item.unitSalePrice ?? 0);
-    const lineTotal = getItemGrossTotal(item);
+      const items = Array.isArray(invoice.items) ? invoice.items : [];
+      const subtotal = getInvoiceSubtotal(invoice, items);
+      const discountAmount = Number(invoice.discountAmount || 0);
+      const total = Number(invoice.totalAmount || 0);
+      const paymentLabels = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card', KHATA: 'Khata' };
+      const paymentMode = paymentLabels[String(invoice.paymentMode || '').toUpperCase()] || invoice.paymentMode || 'Cash';
 
-    return `
-      <tr>
-        <td class="product">${escapeHtml(item.productName || 'Product')}</td>
-        <td class="quantity">${qty.toLocaleString('en-IN', { maximumFractionDigits: 3 })}${unitName}</td>
-        <td class="money">${formatMoney(unitPrice)}</td>
-        <td class="money">${formatMoney(lineTotal)}</td>
-      </tr>`;
-  }).join('');
+      const storeName = process.env.STORE_NAME || 'Shree Pooja Ghar';
+      const storeAddress = process.env.STORE_ADDRESS || 'Ajmer, Rajasthan, India';
+      const storePhone = process.env.STORE_PHONE ? `Phone: ${process.env.STORE_PHONE}` : '';
+      const customerName = invoice.customerName || invoice.customer?.name || 'Guest Customer';
+      const customerPhone = invoice.customerPhone || invoice.customer?.phone || 'Not provided';
+      const invoiceNo = invoice.invoiceNo || 'N/A';
 
-  const html = `<!doctype html>
-    <html lang="en">
-    <head>
-      <meta charset="utf-8">
-      <style>
-        @page { size: A4; margin: 30px 38px; }
-        * { box-sizing: border-box; }
-        body { margin: 0; color: #17212b; background: #fff; font-family: "Noto Sans", "DejaVu Sans", Arial, sans-serif; font-size: 12px; }
-        .top-rule { height: 5px; background: #b77928; margin: 0 0 27px; }
-        .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 20px; border-bottom: 1px solid #d9dee4; }
-        .brand { display: flex; align-items: center; gap: 15px; min-width: 0; }
-        .logo { width: 76px; height: 76px; object-fit: contain; }
-        .logo-fallback { width: 76px; height: 76px; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: #fff7e8; color: #945b18; font-size: 28px; font-weight: 700; }
-        .brand h1 { margin: 0 0 5px; color: #17212b; font-size: 21px; line-height: 1.2; }
-        .brand p { margin: 3px 0; color: #5f6b76; font-size: 11px; }
-        .invoice-heading { text-align: right; }
-        .invoice-heading h2 { margin: 0 0 6px; color: #17212b; font-size: 26px; letter-spacing: 1.4px; }
-        .invoice-heading p { margin: 4px 0; color: #5f6b76; font-size: 11px; }
-        .section-title { margin: 0 0 11px; color: #75808a; font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-        .details { display: flex; justify-content: space-between; gap: 28px; padding: 22px 0 26px; }
-        .customer { flex: 1; }
-        .customer-name { margin-bottom: 6px; color: #17212b; font-size: 15px; font-weight: 700; }
-        .customer p { margin: 3px 0; color: #52606d; font-size: 11px; }
-        .meta { width: 225px; padding: 12px 14px; border: 1px solid #e1e5e9; border-radius: 7px; background: #fafbfc; }
-        .meta-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; color: #58636e; font-size: 10px; }
-        .meta-row strong { color: #17212b; text-align: right; font-size: 10px; }
-        table { width: 100%; border-collapse: collapse; margin: 0 0 18px; }
-        thead { display: table-header-group; }
-        th { padding: 11px 9px; background: #25313b; color: #fff; font-size: 9px; letter-spacing: .5px; text-align: left; text-transform: uppercase; }
-        th:first-child { border-radius: 5px 0 0 5px; }
-        th:last-child { border-radius: 0 5px 5px 0; }
-        td { padding: 12px 9px; border-bottom: 1px solid #e6e9ec; color: #26323c; font-size: 11px; vertical-align: top; }
-        td.product { width: 45%; font-weight: 600; overflow-wrap: anywhere; }
-        td.quantity { width: 17%; color: #52606d; }
-        th.money, td.money { width: 19%; text-align: right; white-space: nowrap; }
-        .summary { display: flex; justify-content: flex-end; margin-top: 8px; page-break-inside: avoid; }
-        .totals { width: 255px; }
-        .total-row { display: flex; justify-content: space-between; padding: 8px 3px; color: #52606d; font-size: 11px; }
-        .total-row.grand { margin-top: 5px; padding: 13px 14px; border-radius: 6px; background: #fff6e8; color: #17212b; font-size: 13px; font-weight: 700; }
-        .total-row.grand strong { color: #945b18; font-size: 16px; }
-        .bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 22px; margin-top: 30px; padding-top: 17px; border-top: 1px solid #d9dee4; page-break-inside: avoid; }
-        .payment { color: #52606d; font-size: 10px; }
-        .payment .section-title { margin-bottom: 7px; }
-        .payment-pill { display: inline-block; padding: 7px 12px; border: 1px solid #e7c99d; border-radius: 20px; background: #fff8ed; color: #784b17; font-size: 11px; font-weight: 700; }
-        .thanks { color: #66727d; font-size: 10px; text-align: right; }
-        .thanks strong { display: block; margin-bottom: 4px; color: #25313b; font-size: 12px; }
-        tr { page-break-inside: avoid; }
-      </style>
-    </head>
-    <body>
-      <div class="top-rule"></div>
-      <header class="header">
-        <div class="brand">
-          ${logo ? `<img class="logo" src="${logo}" alt="${storeName} logo">` : '<div class="logo-fallback">ॐ</div>'}
-          <div>
-            <h1>${storeName}</h1>
-            <p>${storeAddress}</p>
-            ${storePhone ? `<p>Phone: ${storePhone}</p>` : ''}
-          </div>
-        </div>
-        <div class="invoice-heading">
-          <h2>INVOICE</h2>
-          <p><strong>${invoiceNo}</strong></p>
-          <p>${dateLabel} · ${timeLabel}</p>
-        </div>
-      </header>
+      const doc = new PDFDocument({ margin: 40, size: 'A4' });
+      const buffers = [];
 
-      <section class="details">
-        <div class="customer">
-          <h3 class="section-title">Bill to</h3>
-          <div class="customer-name">${customerName}</div>
-          <p>Mobile: ${customerPhone}</p>
-        </div>
-        <div class="meta">
-          <div class="meta-row"><span>Invoice number</span><strong>${invoiceNo}</strong></div>
-          <div class="meta-row"><span>Invoice date</span><strong>${dateLabel}</strong></div>
-          <div class="meta-row"><span>Payment method</span><strong>${paymentMode}</strong></div>
-        </div>
-      </section>
+      doc.on('data', (chunk) => buffers.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', (err) => reject(err));
 
-      <table>
-        <thead><tr><th>Description</th><th>Qty</th><th class="money">Unit price</th><th class="money">Amount</th></tr></thead>
-        <tbody>${itemRows || '<tr><td class="product">No items</td><td></td><td></td><td></td></tr>'}</tbody>
-      </table>
+      // Header Banner
+      doc.rect(40, 40, 515, 6).fill('#ea580c'); // Orange top accent
 
-      <section class="summary">
-        <div class="totals">
-          <div class="total-row"><span>Subtotal</span><strong>${formatMoney(subtotal)}</strong></div>
-          ${discountAmount > 0 ? `<div class="total-row"><span>Cart discount</span><strong>−${formatMoney(discountAmount)}</strong></div>` : ''}
-          <div class="total-row grand"><span>Total</span><strong>${formatMoney(total)}</strong></div>
-        </div>
-      </section>
+      // Store Title
+      doc.fillColor('#0f172a').fontSize(22).font('Helvetica-Bold').text(storeName, 40, 60);
+      doc.fillColor('#64748b').fontSize(9).font('Helvetica')
+        .text(storeAddress, 40, 88)
+        .text(storePhone, 40, 102);
 
-      <footer class="bottom">
-        <div class="payment">
-          <h3 class="section-title">Payment method</h3>
-          <span class="payment-pill">${paymentMode}</span>
-        </div>
-        <div class="thanks"><strong>Thank you for shopping with us.</strong>We appreciate your business.</div>
-      </footer>
-    </body>
-    </html>`;
+      // Invoice Tag
+      doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold')
+        .text('TAX INVOICE', 380, 60, { align: 'right' });
+      doc.fillColor('#64748b').fontSize(9).font('Helvetica')
+        .text(`Invoice #: ${invoiceNo}`, 380, 82, { align: 'right' })
+        .text(`Date: ${dateLabel} ${timeLabel}`, 380, 96, { align: 'right' })
+        .text(`Payment: ${paymentMode}`, 380, 110, { align: 'right' });
 
-  let browser;
-  try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'load' });
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '30px', bottom: '30px', left: '38px', right: '38px' },
-    });
-    // Ensure we always return a proper Node.js Buffer (Puppeteer may return Uint8Array)
-    return Buffer.from(pdfBuffer);
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to generate PDF receipt');
-    throw error;
-  } finally {
-    if (browser) {
-      await browser.close();
+      // Divider line
+      doc.moveTo(40, 130).lineTo(555, 130).strokeColor('#e2e8f0').lineWidth(1).stroke();
+
+      // Customer Info Box
+      doc.fillColor('#0f172a').fontSize(10).font('Helvetica-Bold').text('BILLED TO:', 40, 142);
+      doc.fillColor('#334155').fontSize(11).font('Helvetica-Bold').text(customerName, 40, 156);
+      doc.fillColor('#64748b').fontSize(9).font('Helvetica').text(`Mobile: ${customerPhone}`, 40, 172);
+
+      // Items Table Header
+      const tableTop = 205;
+      doc.rect(40, tableTop, 515, 24).fill('#f8fafc');
+      doc.fillColor('#475569').fontSize(9).font('Helvetica-Bold')
+        .text('ITEM DESCRIPTION', 50, tableTop + 7)
+        .text('QTY', 310, tableTop + 7, { width: 50, align: 'right' })
+        .text('PRICE', 380, tableTop + 7, { width: 70, align: 'right' })
+        .text('TOTAL', 470, tableTop + 7, { width: 75, align: 'right' });
+
+      // Table Rows
+      let y = tableTop + 30;
+      doc.font('Helvetica').fontSize(9).fillColor('#1e293b');
+
+      items.forEach((item) => {
+        const qty = Number(item.qtyInUnit ?? item.quantity ?? 1);
+        const unitName = item.unitName ? ` (${item.unitName})` : '';
+        const unitPrice = Number(item.unitPrice ?? item.unitSalePrice ?? 0);
+        const lineTotal = getItemGrossTotal(item);
+
+        doc.fillColor('#0f172a').font('Helvetica-Bold')
+          .text(item.productName || 'Product', 50, y, { width: 250 });
+        doc.fillColor('#475569').font('Helvetica')
+          .text(`${qty}${unitName}`, 310, y, { width: 50, align: 'right' })
+          .text(`Rs ${unitPrice.toFixed(2)}`, 380, y, { width: 70, align: 'right' })
+          .text(`Rs ${lineTotal.toFixed(2)}`, 470, y, { width: 75, align: 'right' });
+
+        y += 22;
+
+        // Draw light row divider
+        doc.moveTo(40, y - 4).lineTo(555, y - 4).strokeColor('#f1f5f9').lineWidth(0.5).stroke();
+      });
+
+      // Bottom Totals
+      y += 10;
+      doc.moveTo(330, y).lineTo(555, y).strokeColor('#cbd5e1').lineWidth(1).stroke();
+      y += 8;
+
+      doc.fillColor('#64748b').font('Helvetica').fontSize(9)
+        .text('Subtotal:', 340, y, { width: 100, align: 'left' })
+        .text(formatMoney(subtotal), 450, y, { width: 95, align: 'right' });
+
+      if (discountAmount > 0) {
+        y += 16;
+        doc.fillColor('#16a34a').font('Helvetica').fontSize(9)
+          .text('Discount:', 340, y, { width: 100, align: 'left' })
+          .text(`- ${formatMoney(discountAmount)}`, 450, y, { width: 95, align: 'right' });
+      }
+
+      y += 18;
+      doc.rect(330, y - 4, 225, 26).fill('#f1f5f9');
+      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(11)
+        .text('TOTAL AMOUNT:', 340, y + 3, { width: 110, align: 'left' })
+        .text(formatMoney(total), 450, y + 3, { width: 95, align: 'right' });
+
+      // Footer note
+      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica')
+        .text('Thank you for shopping with us! Have a blessed day. 🙏', 40, 750, { align: 'center', width: 515 });
+
+      doc.end();
+    } catch (err) {
+      logger.error({ err }, 'Failed to generate PDF with PDFKit');
+      reject(err);
     }
-  }
+  });
 };
 
+/**
+ * Generate 80mm thermal receipt HTML
+ */
 export const generateThermalReceiptHTML = (invoice) => {
   const createdAt = new Date(invoice.createdAt || Date.now());
   const date = createdAt.toLocaleDateString('en-IN', {
@@ -235,7 +200,7 @@ export const generateThermalReceiptHTML = (invoice) => {
       </div>`;
   }).join('');
 
-  const html = `<!doctype html>
+  return `<!doctype html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
@@ -266,72 +231,33 @@ export const generateThermalReceiptHTML = (invoice) => {
       </style>
     </head>
     <body>
-      <header class="center">
-        <div class="brand">${storeName}</div>
-        <div class="store-details">${storeAddress}${storePhone}</div>
-        <div class="receipt-title">RETAIL INVOICE</div>
-      </header>
-
+      <div class="center brand">${storeName}</div>
+      <div class="center store-details">${storeAddress}${storePhone}</div>
+      <div class="center receipt-title">RETAIL INVOICE</div>
       <section class="meta">
-        <div>Date: ${date}, ${time}</div>
-        <div>Bill No: ${invoiceNo}</div>
+        <div>Invoice: <strong>${invoiceNo}</strong></div>
+        <div>Date: ${date} ${time}</div>
         <div>Payment Mode: ${paymentMode}</div>
       </section>
       <div class="customer">Customer: <strong>${customerName}</strong><br>Mobile: ${customerPhone}</div>
-
       <div class="rule"></div>
-      <div class="items-heading"><span>Item</span><span class="item-qty">Qty</span><span class="item-amount">Amt (Rs)</span></div>
+      <div class="items-heading"><span>Item</span><span class="item-qty">Qty</span><span class="item-amount">Amt</span></div>
       <section class="items">${itemRows || '<div class="item-row"><span class="item-name">No items</span><span></span><span></span></div>'}</section>
       <div class="rule"></div>
-
       <section class="totals">
         <div class="totals-row"><span>Subtotal</span><strong>Rs ${subtotal.toFixed(2)}</strong></div>
-        ${discountAmount > 0 ? `<div class="totals-row"><span>Cart discount</span><strong>- Rs ${discountAmount.toFixed(2)}</strong></div>` : ''}
+        ${discountAmount > 0 ? `<div class="totals-row"><span>Discount</span><strong>- Rs ${discountAmount.toFixed(2)}</strong></div>` : ''}
         <div class="totals-row total"><span>TOTAL</span><strong>Rs ${total.toFixed(2)}</strong></div>
         <div class="totals-row payment"><span>${paymentMode}</span><strong>Rs ${total.toFixed(2)}</strong></div>
       </section>
-      <footer class="footer center">Thank you for shopping with us</footer>
+      <footer class="footer center">Thank you for shopping with us!</footer>
     </body>
-      </html>`;
-
-  return html;
+    </html>`;
 };
 
+/**
+ * Generate 80mm thermal receipt PDF using PDFKit
+ */
 export const generateThermalReceiptPDF = async (invoice) => {
-  const html = generateThermalReceiptHTML(invoice);
-
-  let browser;
-  try {
-    browser = await puppeteer.launch({
-      headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-      ],
-    });
-    const page = await browser.newPage();
-    await page.setViewport({ width: 302, height: 600 });
-    await page.setContent(html, { waitUntil: 'load' });
-    const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
-    const pdfBuffer = await page.pdf({
-      width: '80mm',
-      height: `${bodyHeight}px`,
-      printBackground: true,
-      margin: { top: '0', bottom: '0', left: '0', right: '0' },
-    });
-    return Buffer.from(pdfBuffer);
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to generate thermal PDF receipt');
-    throw error;
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
-  }
+  return generateReceiptPDF(invoice);
 };
