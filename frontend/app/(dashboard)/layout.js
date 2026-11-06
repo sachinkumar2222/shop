@@ -192,9 +192,9 @@ export default function DashboardLayout({ children }) {
       <div className={`mobile-drawer-overlay ${drawerOpen ? 'open' : ''}`} onClick={() => setDrawerOpen(false)} />
       <nav className={`mobile-drawer ${drawerOpen ? 'open' : ''}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <img src="/logo.png" alt="श्री पूजा घर Logo" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'contain' }} />
-            <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>श्री पूजा घर</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <img src="/logo.png" alt="श्री पूजा घर Logo" style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'contain' }} />
+            <span style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)' }}>श्री पूजा घर</span>
           </div>
           <button onClick={() => setDrawerOpen(false)} style={{ background: 'none', border: 'none', color: '#536168', cursor: 'pointer' }}>
             <X size={20} />
@@ -235,10 +235,9 @@ export default function DashboardLayout({ children }) {
         {/* ─── Desktop Sidebar ─── */}
         <aside className="desktop-sidebar">
           <div style={styles.brand}>
-            <img src="/logo.png" alt="श्री पूजा घर Logo" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'contain' }} />
+            <img src="/logo.png" alt="श्री पूजा घर Logo" style={{ width: 58, height: 58, borderRadius: 12, objectFit: 'contain' }} />
             <div>
               <h2 style={styles.brandTitle}>श्री पूजा घर</h2>
-              <span style={styles.brandSubtitle}>Ajmer POS & Analytics</span>
             </div>
           </div>
 
@@ -279,7 +278,7 @@ export default function DashboardLayout({ children }) {
             >
               <Menu size={24} />
             </button>
-            <img src="/logo.png" alt="Logo" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'contain' }} />
+            <img src="/logo.png" alt="Logo" style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'contain' }} />
             <h2 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', flex: 1, textAlign: 'center' }}>
               श्री पूजा घर
             </h2>
@@ -425,15 +424,15 @@ export default function DashboardLayout({ children }) {
 
 const styles = {
   brand: {
-    display: 'flex', alignItems: 'center', gap: '0.75rem',
-    paddingBottom: '1.3rem', borderBottom: '1px solid var(--border-color)',
+    display: 'flex', alignItems: 'center', gap: '0.85rem',
+    paddingBottom: '1.2rem', borderBottom: '1px solid var(--border-color)',
   },
   logoIcon: {
     width: 40, height: 40, borderRadius: 10,
     background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.3)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-  brandTitle: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 },
+  brandTitle: { fontSize: '1.28rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' },
   brandSubtitle: { fontSize: '0.7rem', color: '#64748b', display: 'block' },
   nav: { display: 'flex', flexDirection: 'column', gap: '0.35rem', margin: '1.2rem 0', flex: 1, overflowY: 'auto', minHeight: 0 },
   navItem: {
