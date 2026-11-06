@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '../../../lib/api.js';
 import { useAuth } from '../../../context/AuthContext.js';
-import { Package, Plus, AlertTriangle, Layers, Tag, DollarSign, Search, Trash2, X, Check } from 'lucide-react';
+import { Package, Plus, AlertTriangle, Layers, Tag, DollarSign, Search, Trash2, X, Check, Edit } from 'lucide-react';
 
 const getPurchaseUnits = (product) => {
   const units = product?.units || [];
@@ -30,6 +30,7 @@ export default function InventoryPage() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [editingProduct, setEditingProduct] = useState(null);
 
   // New Product Form
   const [nameEn, setNameEn] = useState('');
@@ -157,48 +158,65 @@ export default function InventoryPage() {
     }
   };
 
-  // Add New Product
-  const handleAddProduct = async (e) => {
+  // Add or Edit Product
+  const handleSaveProduct = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const res = await apiFetch('/products', {
-        method: 'POST',
-        body: JSON.stringify({
-          nameEn,
-          nameHi,
-          categoryId,
-          baseUnit,
-          allowDecimalQty,
-          lowStockThreshold: parseFloat(lowStockThreshold) || 0,
-          barcode: barcode.trim() || undefined,
-          units: units.map((u, i) => ({
-            ...u,
-            factorToBase: parseFloat(u.factorToBase) || 1.0,
-            marginPercent: parseFloat(u.marginPercent) || 0,
-            priceOverride: u.priceOverride ? parseFloat(u.priceOverride) : null,
-            minQty: parseFloat(u.minQty) || 1.0,
-            qtyStep: parseFloat(u.qtyStep) || 1.0,
-            sortOrder: i,
-          })),
-        }),
-      });
+      const payload = {
+        nameEn,
+        nameHi: nameHi || null,
+        categoryId,
+        baseUnit,
+        allowDecimalQty,
+        lowStockThreshold: parseFloat(lowStockThreshold) || 0,
+        barcode: barcode.trim() || undefined,
+        units: units.map((u, i) => ({
+          ...(u.id ? { id: u.id } : {}),
+          nameEn: u.nameEn,
+          nameHi: u.nameHi || '',
+          factorToBase: parseFloat(u.factorToBase) || 1.0,
+          marginPercent: parseFloat(u.marginPercent) || 0,
+          priceOverride: u.priceOverride ? parseFloat(u.priceOverride) : null,
+          minQty: parseFloat(u.minQty) || 1.0,
+          qtyStep: parseFloat(u.qtyStep) || 1.0,
+          isPurchaseUnit: Boolean(u.isPurchaseUnit),
+          isSellUnit: Boolean(u.isSellUnit),
+          sortOrder: i,
+        })),
+      };
 
-      const product = res.data;
+      let product = null;
 
-      if (imageFile && product?.id) {
+      if (editingProduct) {
+        const res = await apiFetch(`/products/${editingProduct.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
+        product = res.data;
+      } else {
+        const res = await apiFetch('/products', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        product = res.data;
+      }
+
+      const pid = product?.id || editingProduct?.id;
+
+      if (imageFile && pid) {
         const formData = new FormData();
         formData.append('image', imageFile);
-        await fetch(`/api/v1/products/${product.id}/image`, {
+        await fetch(`/api/v1/products/${pid}/image`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
           body: formData,
         });
       }
 
-      if (notifyWhatsAppBatch && product?.id) {
+      if (!editingProduct && notifyWhatsAppBatch && product?.id) {
         try {
           await apiFetch('/whatsapp/broadcast', {
             method: 'POST',
@@ -213,10 +231,44 @@ export default function InventoryPage() {
       resetProductForm();
       fetchProducts();
     } catch (err) {
-      setError(err.message || 'Failed to add product');
+      setError(err.message || 'Failed to save product');
     } finally {
       setLoading(false);
     }
+  };
+
+  const openEditModal = (p) => {
+    setEditingProduct(p);
+    setError('');
+    setNameEn(p.nameEn || '');
+    setNameHi(p.nameHi || '');
+    setCategoryId(p.categoryId || (p.category ? p.category.id : ''));
+    setBaseUnit(p.baseUnit || 'kg');
+    setAllowDecimalQty(Boolean(p.allowDecimalQty));
+    setBarcode(p.barcode || '');
+    setLowStockThreshold(p.lowStockThreshold !== undefined && p.lowStockThreshold !== null ? p.lowStockThreshold : 10);
+    setImageFile(null);
+    setImagePreview(p.imageUrl || null);
+
+    if (Array.isArray(p.units) && p.units.length > 0) {
+      setUnits(p.units.map(u => ({
+        id: u.id,
+        nameEn: u.nameEn,
+        nameHi: u.nameHi || '',
+        factorToBase: Number(u.factorToBase) || 1.0,
+        isPurchaseUnit: Boolean(u.isPurchaseUnit),
+        isSellUnit: Boolean(u.isSellUnit),
+        marginPercent: Number(u.marginPercent) || 20,
+        priceOverride: u.priceOverride !== null && u.priceOverride !== undefined ? String(u.priceOverride) : '',
+        minQty: Number(u.minQty) || 1,
+        qtyStep: Number(u.qtyStep) || 1,
+      })));
+    } else {
+      setUnits([
+        { nameEn: p.baseUnit, nameHi: p.nameHi || p.baseUnit, factorToBase: 1.0, isPurchaseUnit: true, isSellUnit: true, marginPercent: 20, priceOverride: '' }
+      ]);
+    }
+    setShowProductModal(true);
   };
 
   // Add Batch Stock
@@ -261,6 +313,7 @@ export default function InventoryPage() {
   };
 
   const resetProductForm = () => {
+    setEditingProduct(null);
     setNameEn('');
     setNameHi('');
     setBarcode('');
@@ -403,6 +456,14 @@ export default function InventoryPage() {
                         <button onClick={() => openBatchModalForProduct(p)} className="btn btn-sm btn-secondary" title="Add Stock Batch">
                           <Plus size={14} /> Add Batch
                         </button>
+                        <button
+                          onClick={() => openEditModal(p)}
+                          className="btn btn-sm btn-secondary"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: '#0284c7', borderColor: '#bae6fd' }}
+                          title="Edit Product"
+                        >
+                          <Edit size={14} /> Edit
+                        </button>
                         <button onClick={() => handleDeleteProduct(p.id, p.nameEn)} className="btn btn-sm" style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.3)', padding: '0.4rem 0.6rem' }} title="Delete product">
                           <Trash2 size={14} />
                         </button>
@@ -420,26 +481,30 @@ export default function InventoryPage() {
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
             <div className="inv-modal glass-panel animate-fade-in">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Add Multi-Unit Product</h2>
-                <button onClick={() => setShowProductModal(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}><X size={20} /></button>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                  {editingProduct ? `Edit Product: ${editingProduct.nameEn}` : 'Add Multi-Unit Product'}
+                </h2>
+                <button onClick={() => { setShowProductModal(false); resetProductForm(); }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}><X size={20} /></button>
               </div>
 
               {error && <div style={{ background: '#fff1f2', color: '#be123c', border: '1px solid #fecdd3', padding: '0.6rem', borderRadius: 8, fontSize: '0.85rem', marginBottom: '1rem' }}>⚠️ {error}</div>}
 
-              {/* Quick Presets */}
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ fontSize: '0.8rem', color: '#475569', display: 'block', marginBottom: '0.4rem', fontWeight: 600 }}>Quick Product Presets:</label>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button type="button" className="preset-btn" onClick={() => applyPreset('kg_bori')}>🌾 kg + bori (50kg)</button>
-                  <button type="button" className="preset-btn" onClick={() => applyPreset('gram_bori')}>⚖️ gram + bori (25kg)</button>
-                  <button type="button" className="preset-btn" onClick={() => applyPreset('ml_tin')}>🛢️ ml + tin (15L)</button>
-                  <button type="button" className="preset-btn" onClick={() => applyPreset('piece_dozen')}>🔔 piece + dozen</button>
-                  <button type="button" className="preset-btn" onClick={() => applyPreset('bottle_carton')}>🍾 bottle + carton (24)</button>
-                  <button type="button" className="preset-btn" onClick={() => applyPreset('single_unit')}>📦 Single Unit Only</button>
+              {/* Quick Presets (only for new products) */}
+              {!editingProduct && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ fontSize: '0.8rem', color: '#475569', display: 'block', marginBottom: '0.4rem', fontWeight: 600 }}>Quick Product Presets:</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button type="button" className="preset-btn" onClick={() => applyPreset('kg_bori')}>🌾 kg + bori (50kg)</button>
+                    <button type="button" className="preset-btn" onClick={() => applyPreset('gram_bori')}>⚖️ gram + bori (25kg)</button>
+                    <button type="button" className="preset-btn" onClick={() => applyPreset('ml_tin')}>🛢️ ml + tin (15L)</button>
+                    <button type="button" className="preset-btn" onClick={() => applyPreset('piece_dozen')}>🔔 piece + dozen</button>
+                    <button type="button" className="preset-btn" onClick={() => applyPreset('bottle_carton')}>🍾 bottle + carton (24)</button>
+                    <button type="button" className="preset-btn" onClick={() => applyPreset('single_unit')}>📦 Single Unit Only</button>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <form onSubmit={handleAddProduct}>
+              <form onSubmit={handleSaveProduct}>
                 <div className="form-grid">
                   <div className="input-group">
                     <label>English Name</label>
@@ -647,27 +712,31 @@ export default function InventoryPage() {
                   {imagePreview && <img src={imagePreview} alt="preview" style={{ marginTop: '0.5rem', width: 60, height: 60, objectFit: 'cover', borderRadius: 8 }} />}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.75rem 1rem', borderRadius: '8px', marginTop: '1rem' }}>
-                  <input 
-                    type="checkbox" 
-                    id="notifyWhatsAppBatch" 
-                    checked={notifyWhatsAppBatch} 
-                    onChange={(e) => setNotifyWhatsAppBatch(e.target.checked)}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#16a34a' }}
-                  />
-                  <div>
-                    <label htmlFor="notifyWhatsAppBatch" style={{ cursor: 'pointer', fontWeight: 600, color: '#166534', margin: 0, fontSize: '0.9rem', display: 'block' }}>
-                      📢 WhatsApp Broadcast: सभी ग्राहकों को नए स्टॉक की सूचना भेजें
-                    </label>
-                    <span style={{ color: '#15803d', fontSize: '0.78rem' }}>
-                      स्टॉक ऐड होते ही ग्राहकों के WhatsApp पर पर्सनलाइज्ड अपडेट जाएगा।
-                    </span>
+                {!editingProduct && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.75rem 1rem', borderRadius: '8px', marginTop: '1rem' }}>
+                    <input 
+                      type="checkbox" 
+                      id="notifyWhatsAppBatch" 
+                      checked={notifyWhatsAppBatch} 
+                      onChange={(e) => setNotifyWhatsAppBatch(e.target.checked)}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#16a34a' }}
+                    />
+                    <div>
+                      <label htmlFor="notifyWhatsAppBatch" style={{ cursor: 'pointer', fontWeight: 600, color: '#166534', margin: 0, fontSize: '0.9rem', display: 'block' }}>
+                        📢 WhatsApp Broadcast: सभी ग्राहकों को नए स्टॉक की सूचना भेजें
+                      </label>
+                      <span style={{ color: '#15803d', fontSize: '0.78rem' }}>
+                        स्टॉक ऐड होते ही ग्राहकों के WhatsApp पर पर्सनलाइज्ड अपडेट जाएगा।
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button type="button" onClick={() => setShowProductModal(false)} className="btn btn-secondary">Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Saving...' : 'Create Product'}</button>
+                  <button type="button" onClick={() => { setShowProductModal(false); resetProductForm(); }} className="btn btn-secondary">Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={loading}>
+                    {loading ? 'Saving...' : editingProduct ? 'Update Product' : 'Create Product'}
+                  </button>
                 </div>
               </form>
             </div>
