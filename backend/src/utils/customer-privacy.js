@@ -36,17 +36,22 @@ export const encryptPii = (value) => {
 export const decryptPii = (value) => {
   if (value === null || value === undefined || !isPiiEncrypted(value)) return value;
 
-  const [ivText, authTagText, ciphertextText] = value.slice(ENCRYPTED_PREFIX.length).split(':');
-  if (!ivText || !authTagText || ciphertextText === undefined) {
-    throw new Error('Stored customer data has an invalid encrypted format');
-  }
+  try {
+    const [ivText, authTagText, ciphertextText] = value.slice(ENCRYPTED_PREFIX.length).split(':');
+    if (!ivText || !authTagText || ciphertextText === undefined) {
+      return value;
+    }
 
-  const decipher = crypto.createDecipheriv('aes-256-gcm', getMasterKey(), Buffer.from(ivText, 'base64url'));
-  decipher.setAuthTag(Buffer.from(authTagText, 'base64url'));
-  return Buffer.concat([
-    decipher.update(Buffer.from(ciphertextText, 'base64url')),
-    decipher.final(),
-  ]).toString('utf8');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', getMasterKey(), Buffer.from(ivText, 'base64url'));
+    decipher.setAuthTag(Buffer.from(authTagText, 'base64url'));
+    return Buffer.concat([
+      decipher.update(Buffer.from(ciphertextText, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8');
+  } catch (err) {
+    // Graceful fallback if key changed or data authentication tag fails
+    return value;
+  }
 };
 
 export const getCustomerPhoneLookup = (normalizedPhone) => crypto

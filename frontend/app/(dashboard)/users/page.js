@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../../../lib/api.js';
+import { useAuth } from '../../../context/AuthContext.js';
 import { UserCheck, Plus, Trash2, Mail, Lock, User, Shield } from 'lucide-react';
 
 export default function UsersPage() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [showModal, setShowModal] = useState(false);
   
@@ -131,42 +133,59 @@ export default function UsersPage() {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
-              <tr key={u.id}>
-                <td>
-                  <strong style={{ fontSize: '0.95rem' }}>{u.name}</strong>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#536168' }}>
-                    <Mail size={14} />
-                    <span>{u.email}</span>
-                  </div>
-                </td>
-                <td>
-                  <span
-                    className={`badge ${
-                      u.role === 'ADMIN' ? 'badge-warning' : 'badge-info'
-                    }`}
-                  >
-                    {u.role === 'ADMIN' ? '👑 ADMIN' : '🛒 CASHIER'}
-                  </span>
-                </td>
-                <td>
-                  {new Date(u.createdAt).toLocaleDateString('en-IN', {
-                    dateStyle: 'medium',
-                  })}
-                </td>
-                <td>
-                  <button
-                    onClick={() => handleDeleteUser(u.id, u.name)}
-                    className="btn btn-sm btn-secondary"
-                    title="Delete Account"
-                  >
-                    <Trash2 size={14} color="#f43f5e" /> Delete
-                  </button>
+            {users.length === 0 ? (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '2.5rem', color: '#64748b' }}>
+                  No staff accounts found. Click <strong>Add New Cashier / Staff</strong> above to add one.
                 </td>
               </tr>
-            ))}
+            ) : (
+              users.map((u) => (
+                <tr key={u.id}>
+                  <td>
+                    <strong style={{ fontSize: '0.95rem' }}>{u.name}</strong>
+                    {currentUser?.id === u.id && (
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.72rem', background: '#f1f5f9', color: '#64748b', padding: '2px 6px', borderRadius: 4 }}>
+                        (You)
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#536168' }}>
+                      <Mail size={14} />
+                      <span>{u.email}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span
+                      className={`badge ${
+                        u.role === 'ADMIN' ? 'badge-warning' : 'badge-info'
+                      }`}
+                    >
+                      {u.role === 'ADMIN' ? '👑 ADMIN' : '🛒 CASHIER'}
+                    </span>
+                  </td>
+                  <td>
+                    {new Date(u.createdAt).toLocaleDateString('en-IN', {
+                      dateStyle: 'medium',
+                    })}
+                  </td>
+                  <td>
+                    {currentUser?.id === u.id ? (
+                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Active Session</span>
+                    ) : (
+                      <button
+                        onClick={() => handleDeleteUser(u.id, u.name)}
+                        className="btn btn-sm btn-secondary"
+                        title="Delete Account"
+                      >
+                        <Trash2 size={14} color="#f43f5e" /> Delete
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
